@@ -1,0 +1,38 @@
+[
+  {
+    "id": "1",
+    "title": "Bonolota's Garden",
+    "artist": "Mehnaz Rahman",
+    "image": "/images/artworks/artwork-1.jpg",
+    "price": 4500,
+    "category": "Painting",
+    "description": "A dreamlike acrylic study of a courtyard garden at dusk, where hibiscus blooms fold into human silhouettes. Layered brushwork in deep magenta and gold."
+  },
+  {
+    "id": "2",
+    "title": "Monsoon Circuit",
+    "artist": "Tanvir Ahmed",
+    "image": "/images/artworks/artwork-2.jpg",
+    "price": 6200,
+    "category": "Digital",
+    "description": "A surreal digital portrait fusing rain-soaked rickshaw lights with fragmented glass reflections. Part of the artist's 'City Static' series."
+  },
+  {
+    "id": "3",
+    "title": "Clay Whisperer",
+    "artist": "Farzana Chowdhury",
+    "image": "/images/artworks/artwork-3.jpg",
+    "price": 8900,
+    "category": "Sculpture",
+    "description": "A hand-built terracotta figure mid-gesture, glazed in warm ochres. Inspired by potters of Old Dhaka and the rhythm of the wheel."
+  },
+  {
+    "id": "4",
+    "title": "Lalbagh Reverie",
+    "artist": "Imran Kabir",
+    "image": "/images/artworks/artwork-4.jpg",
+    "price": 5300,
+    "category": "Painting",
+    "description": "An oil-on-canvas reimagining of Lalbagh Fort wrapped in floating banyan leaves and birds, blending heritage architecture with folk motifs."
+  }
+]
