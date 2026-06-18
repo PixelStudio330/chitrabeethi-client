@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Fraunces, Inter } from "next/font/google";
 import "./globals.css";
 import Navbar from "./components/Navbar";
+import { Toaster } from "react-hot-toast";
+import { AuthProvider } from './context/AuthContext';
 
 const fraunces = Fraunces({
   subsets: ["latin"],
@@ -27,10 +29,13 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      {/* ADDED bg-cream AND text-ink HERE TO POWER THE WHOLE SITE BACKGROUND */}
       <body className={`${fraunces.variable} ${inter.variable} font-body bg-cream text-ink antialiased`}>
-        <Navbar />
-        {children}
+        {/* The global toaster */}
+        <Toaster position="top-center" reverseOrder={false} />
+        <AuthProvider>
+          <Navbar />
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );
