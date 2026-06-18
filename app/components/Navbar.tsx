@@ -10,26 +10,29 @@ import { useAuth } from "../context/AuthContext";
 export default function Header() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isMounted, setIsMounted] = useState(false); // 🌟 Tracks initial page settlement
   const pathname = usePathname();
   const router = useRouter();
 
   // 🛡️ Access synchronized global auth state
   const { user, token, logout, isLoading } = useAuth();
 
-  // Kinetic Physics Base (Hanging effect)
+  // Kinetic Physics Base (Hanging effect for links)
   const { scrollY } = useScroll();
   const scrollVelocity = useVelocity(scrollY);
   const rotationTarget = useTransform(scrollVelocity, [-2000, 2000], [-12, 12]);
   const smoothRotation = useSpring(rotationTarget, { damping: 12, stiffness: 90 });
 
+  // Handle scroll detection
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 40);
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // Kill kinetics on page change
+  // Stabilize physics layout on mount and path switch
   useEffect(() => {
+    setIsMounted(true);
     smoothRotation.set(0);
     scrollVelocity.set(0);
   }, [pathname, smoothRotation, scrollVelocity]);
@@ -48,13 +51,18 @@ export default function Header() {
       <nav className="fixed w-full top-0 left-0 z-[100] pointer-events-none transition-all duration-300">
         <div className="max-w-7xl mx-auto relative h-32 md:h-40 px-6">
           
-          {/* --- LAYER 1: DECORATIVE BRANCHES --- */}
+          {/* --- LAYER 1: DECORATIVE BRANCHES (ANIMATION FIX) --- */}
           <motion.div 
+            initial={{ opacity: 0, y: 0 }} // 🌟 FIXED: Explicit baseline y coordinate prevents layout calculation jumps
             animate={{ 
               y: isScrolled ? -20 : 0, 
               opacity: isScrolled ? 0 : 0.9
             }}
-            transition={{ type: "spring", stiffness: 100, damping: 22 }}
+            transition={{ 
+              duration: 0.4, 
+              ease: "easeOut",
+              layout: { type: "tween" } // 🌟 FIXED: Prevents Next.js route switching from running auto layout scaling
+            }}
             className="absolute inset-x-0 top-0 h-full z-0 overflow-visible"
           >
             <svg viewBox="0 0 1200 160" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full object-cover md:object-fill drop-shadow-[0_4px_12px_rgba(0,0,0,0.15)]">
@@ -104,7 +112,7 @@ export default function Header() {
                     key={link.href}
                     animate={{ y: isScrolled ? -2 : 0 }}
                     style={{ 
-                      rotate: isScrolled ? 0 : smoothRotation, 
+                      rotate: !isMounted || isScrolled ? 0 : smoothRotation, 
                       transformOrigin: "top center" 
                     }}
                     whileHover={isScrolled ? { scale: 1.05 } : { scale: 1.05, rotate: 3 }}
@@ -148,12 +156,12 @@ export default function Header() {
             <div className="flex items-center gap-3 md:gap-4 lg:gap-5 mt-1 md:mt-3 pr-4">
               {!isLoading && (
                 <div className="hidden md:flex items-center gap-3 lg:gap-4">
-                  {/* Dashboard link displays if authorized */}
+                  {/* Dashboard link */}
                   {user && (
                     <motion.div
                       animate={{ y: isScrolled ? -2 : 0 }}
                       style={{ 
-                        rotate: isScrolled ? 0 : smoothRotation, 
+                        rotate: !isMounted || isScrolled ? 0 : smoothRotation, 
                         transformOrigin: "top center" 
                       }}
                       whileHover={isScrolled ? { scale: 1.05 } : { scale: 1.05, rotate: -3 }}
@@ -182,7 +190,7 @@ export default function Header() {
                     <motion.div
                       animate={{ y: isScrolled ? -2 : 0 }}
                       style={{ 
-                        rotate: isScrolled ? 0 : smoothRotation, 
+                        rotate: !isMounted || isScrolled ? 0 : smoothRotation, 
                         transformOrigin: "top center" 
                       }}
                       whileHover={isScrolled ? { scale: 1.05 } : { scale: 1.05, rotate: -3 }}
@@ -211,7 +219,7 @@ export default function Header() {
                     <motion.div
                       animate={{ y: isScrolled ? -2 : 0 }}
                       style={{ 
-                        rotate: isScrolled ? 0 : smoothRotation, 
+                        rotate: !isMounted || isScrolled ? 0 : smoothRotation, 
                         transformOrigin: "top center" 
                       }}
                       whileHover={isScrolled ? { scale: 1.05 } : { scale: 1.05, rotate: -3 }}
@@ -237,27 +245,25 @@ export default function Header() {
                 </div>
               )}
 
-              {/* DYNAMIC PROFILE AVATAR WRAPPER WITH LOGOUT BUTTON SIDE-BY-SIDE */}
+              {/* DYNAMIC PROFILE AVATAR WRAPPER */}
               {user && (
                 <motion.div
                   animate={{ y: isScrolled ? -2 : 0 }}
                   style={{ 
-                    rotate: isScrolled ? 0 : smoothRotation, 
+                    rotate: !isMounted || isScrolled ? 0 : smoothRotation, 
                     transformOrigin: "top center" 
                   }}
                   className="flex items-center gap-3 pl-1 relative"
                 >
-                  {/* Decorative Hanging Rope Thread (Hidden when scrolled) */}
-                  <div className="absolute top-0 left-5 flex flex-col items-center pointer-events-none">
+                  <div className="absolute top-0 left-6 flex flex-col items-center pointer-events-none">
                     <motion.div animate={{ height: isScrolled ? 0 : 24, opacity: isScrolled ? 0 : 0.6 }} className="w-[1.5px] bg-[#3D2B1F]" />
                   </div>
                   
-                  {/* Core Avatar Frame Profile Dashboard Trigger */}
-                  <div className="relative w-9 h-9 md:w-10 md:h-10 mt-6 md:mt-0">
-                    <Link href={`/dashboard/${user.role}`} className="block w-full h-full rounded-full border-2 border-[#8A9A5B] bg-[#3D2B1F] flex items-center justify-center overflow-hidden transition-transform duration-300 hover:scale-105 shadow-md">
-                      {user.profilePicture ? (
+                  <div className="relative w-11 h-11 md:w-12 md:h-12 mt-6 md:mt-0 flex items-center justify-center">
+                    <Link href="/profile" className="block w-full h-full rounded-full border-2 border-[#8A9A5B] bg-[#3D2B1F] flex items-center justify-center overflow-hidden transition-transform duration-300 hover:scale-105 shadow-md">
+                      {(user.profilePicture || user.photoUrl) ? (
                         <img 
-                          src={`/api/proxy-avatar?url=${encodeURIComponent(user.profilePicture)}`} 
+                          src={`/api/proxy-avatar?url=${encodeURIComponent(user.profilePicture || user.photoUrl)}`} 
                           alt={user.name || "User Avatar"} 
                           className="w-full h-full object-cover"
                           onError={(e) => {
@@ -265,14 +271,13 @@ export default function Header() {
                           }}
                         />
                       ) : (
-                        <span className="text-[11px] font-black uppercase text-[#E2B4BD]">
-                          {user.name ? user.name.charAt(0) : <User size={14} />}
+                        <span className="text-sm font-black uppercase text-[#E2B4BD]">
+                          {user.name ? user.name.charAt(0) : <User size={16} />}
                         </span>
                       )}
                     </Link>
                   </div>
 
-                  {/* 🌟 NEW: Clean, Side-By-Side Exit Button Node */}
                   {token && (
                     <motion.button
                       onClick={(e) => {
@@ -343,13 +348,22 @@ export default function Header() {
                 </Link>
                 
                 {user && (
-                  <Link 
-                    href={`/dashboard/${user.role}`}
-                    onClick={() => setMobileMenuOpen(false)} 
-                    className={`text-3xl font-black uppercase flex justify-between items-center transition-colors ${pathname.startsWith("/dashboard") ? "text-[#8A9A5B]" : "text-[#E2B4BD]"}`}
-                  >
-                    Dashboard <ArrowRight className="text-[#8A9A5B]" />
-                  </Link>
+                  <>
+                    <Link 
+                      href={`/dashboard/${user.role}`}
+                      onClick={() => setMobileMenuOpen(false)} 
+                      className={`text-3xl font-black uppercase flex justify-between items-center transition-colors ${pathname.startsWith("/dashboard") ? "text-[#8A9A5B]" : "text-[#E2B4BD]"}`}
+                    >
+                      Dashboard <ArrowRight className="text-[#8A9A5B]" />
+                    </Link>
+                    <Link 
+                      href="/profile"
+                      onClick={() => setMobileMenuOpen(false)} 
+                      className={`text-3xl font-black uppercase flex justify-between items-center transition-colors ${isActive("/profile") ? "text-[#8A9A5B]" : "text-[#E2B4BD]"}`}
+                    >
+                      My Profile <ArrowRight className="text-[#8A9A5B]" />
+                    </Link>
+                  </>
                 )}
               </div>
             </div>
