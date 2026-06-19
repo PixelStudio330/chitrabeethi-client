@@ -122,10 +122,10 @@ export default function Home() {
               </p>
               <div className="mt-6 md:mt-8 flex flex-wrap gap-3 md:gap-4 justify-center lg:justify-start">
                 <button 
-                  onClick={() => window.location.href = '/track'}
+                  onClick={() => window.location.href = '/browse'}
                   className="bg-[#3D2B1F] text-[#E2B4BD] text-[9px] md:text-[10px] py-3 md:py-4 px-8 md:px-10 rounded-full uppercase tracking-widest font-black hover:bg-[#8A9A5B] hover:text-[#3D2B1F] transition-all duration-300 shadow-xl"
                 >
-                  View Gallery
+                  Browse Artworks
                 </button>
                 <button className="border-2 border-[#3D2B1F] text-[#3D2B1F] text-[9px] md:text-[10px] py-3 md:py-4 px-8 md:px-10 rounded-full uppercase tracking-widest font-black hover:bg-[#3D2B1F] hover:text-[#E2B4BD] transition-all duration-300">
                   Our Story

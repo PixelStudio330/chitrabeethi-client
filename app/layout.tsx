@@ -4,6 +4,7 @@ import "./globals.css";
 import Navbar from "./components/Navbar";
 import { Toaster } from "react-hot-toast";
 import { AuthProvider } from './context/AuthContext';
+import { WishlistProvider } from "../utils/WishlistContext"; // Correctly importing from utils
 import { GoogleOAuthProvider } from '@react-oauth/google';
 
 const fraunces = Fraunces({
@@ -35,11 +36,13 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${fraunces.variable} ${inter.variable} font-body bg-cream text-ink antialiased`}>
         {/* The global toaster */}
-        <Toaster position="top-center" reverseOrder={false} />
+        <Toaster position="top-left" reverseOrder={false} />
         <GoogleOAuthProvider clientId={googleClientId}>
           <AuthProvider>
-            <Navbar />
-            {children}
+            <WishlistProvider>
+              <Navbar />
+              {children}
+            </WishlistProvider>
           </AuthProvider>
         </GoogleOAuthProvider>
       </body>
