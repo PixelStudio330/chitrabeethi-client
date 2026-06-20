@@ -2,7 +2,25 @@
 
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Heart, ShoppingBag, ArrowLeft, Sparkles, ShieldCheck, Paintbrush, Calendar, Tag, MessageSquare, Send, Trash2, Edit, X, Check } from "lucide-react";
+import { 
+  Heart, 
+  ShoppingBag, 
+  ArrowLeft, 
+  Sparkles, 
+  ShieldCheck, 
+  Paintbrush, 
+  Calendar, 
+  Tag, 
+  MessageSquare, 
+  Send, 
+  Trash2, 
+  Edit, 
+  X, 
+  Check,
+  Loader2,
+  Layers,
+  Activity
+} from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { getArtworkById, getCommentsByArtwork, postComment, ArtworkData, CommentData } from "../../../utils/api";
@@ -18,14 +36,35 @@ export default function ArtworkDetails() {
 
   const [artwork, setArtwork] = useState<ArtworkData | null>(null);
   const [comments, setComments] = useState<CommentData[]>([]);
-  const [hasPurchased, setHasPurchased] = useState<boolean>(false); // Core restriction checker state
+  const [hasPurchased, setHasPurchased] = useState<boolean>(false); 
   const [newComment, setNewComment] = useState("");
   const [loading, setLoading] = useState(true);
   const [isZoomed, setIsZoomed] = useState(false);
   const [paymentLoading, setPaymentLoading] = useState(false);
 
+  // Modal Control States
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false); // For Comments
+  const [isArtEditModalOpen, setIsArtEditModalOpen] = useState(false); // For Artwork Listing
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [isSavingArtwork, setIsSavingArtwork] = useState(false);
+  const [isDeletingArtwork, setIsDeletingArtwork] = useState(false);
+
+  // Artwork Editing Form State (Added 'status' here)
+  const [artFormData, setArtFormData] = useState({
+    name: "",
+    price: 0,
+    category: "Painting",
+    tag: "",
+    description: "",
+    img: "",
+    status: "available"
+  });
+
+  // Toast Notification States
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toastType, setToastType] = useState<"success" | "info" | "error">("success");
 
   const isWishlisted = wishlist.includes(id as string);
 
@@ -39,11 +78,22 @@ export default function ArtworkDetails() {
         const artData = await getArtworkById(id as string);
         setArtwork(artData);
 
-        // Dispatches user.id directly to verify database records on load
+        // Map initial structural form values from backend schema properties
+        if (artData) {
+          setArtFormData({
+            name: artData.name || "",
+            price: artData.price || 0,
+            category: artData.category || "Painting",
+            tag: artData.tag || "",
+            description: artData.description || "",
+            img: artData.img || "",
+            status: artData.status || "available"
+          });
+        }
+
         const responseData = await getCommentsByArtwork(id as string, user?.id);
-        
-        setComments(responseData.comments);
-        setHasPurchased(responseData.hasPurchased);
+        setComments(responseData.comments || []);
+        setHasPurchased(responseData.hasPurchased || false);
       } catch (err) {
         console.error("Database connection failure on resource lookup:", err);
         setArtwork(null);
@@ -53,7 +103,15 @@ export default function ArtworkDetails() {
     }
 
     loadArtworkDetails();
-  }, [id, user?.id]); // Re-runs validation checks automatically if the user authentication state syncs up late
+  }, [id, user?.id]);
+
+  const showToast = (message: string, type: "success" | "info" | "error" = "success") => {
+    setToastMessage(message);
+    setToastType(type);
+    setTimeout(() => {
+      setToastMessage(null);
+    }, 3000);
+  };
 
   const handlePurchase = async () => {
     if (!user) {
@@ -86,9 +144,103 @@ export default function ArtworkDetails() {
       }
     } catch (err) {
       console.error("Critical failure initializing Stripe Checkout engine:", err);
-      alert("Could not connect to the transaction gate. Please check terminal logs.");
+      alert("Could not connect to the transaction gate.");
     } finally {
       setPaymentLoading(false);
+    }
+  };
+
+  // Submit revised artwork fields directly to backend REST server engine
+  const handleSaveArtworkEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user?.id || !id || !artwork) return;
+
+    try {
+      setIsSavingArtwork(true);
+      
+      // Building exact payload with authUser details to satisfy updateArtwork controller guard rules
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/artworks/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          authUser: {
+            id: user.id,
+            role: user.role || "artist"
+          },
+          name: artFormData.name,
+          price: Number(artFormData.price),
+          category: artFormData.category,
+          tag: artFormData.tag,
+          description: artFormData.description,
+          img: artFormData.img,
+          status: artFormData.status
+        })
+      });
+
+      const resData = await response.json();
+
+      if (!response.ok) {
+        showToast(resData.message || "Could not save structural changes.", "error");
+        return;
+      }
+
+      // Sync active view reference layout state instantly 
+      setArtwork((prev) => prev ? { 
+        ...prev, 
+        name: artFormData.name,
+        price: artFormData.price,
+        category: artFormData.category,
+        tag: artFormData.tag,
+        description: artFormData.description,
+        img: artFormData.img,
+        status: artFormData.status
+      } : null);
+
+      setIsArtEditModalOpen(false);
+      showToast("Studio artwork properties saved successfully!", "success");
+    } catch (err) {
+      console.error("Critical server write update exception error:", err);
+      showToast("Connection to server timed out.", "error");
+    } finally {
+      setIsSavingArtwork(false);
+    }
+  };
+
+  // Permanently purge artwork listing asset from system repository
+  const handleDeleteArtwork = async () => {
+    if (!user?.id || !id) return;
+    if (!confirm("Are you completely certain you want to purge this artwork from the vault repository? This cannot be undone.")) return;
+
+    try {
+      setIsDeletingArtwork(true);
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/artworks/${id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          authUser: {
+            id: user.id,
+            role: user.role || "artist"
+          }
+        })
+      });
+
+      const resData = await response.json();
+
+      if (!response.ok) {
+        showToast(resData.message || "Failed to complete registry drop request.", "error");
+        return;
+      }
+
+      showToast("Masterpiece registry index dropped.", "info");
+      setTimeout(() => {
+        router.push("/browse");
+      }, 1500);
+
+    } catch (err) {
+      console.error("Failed to remove target artwork entry:", err);
+      showToast("Could not contact server registry layer.", "error");
+    } finally {
+      setIsDeletingArtwork(false);
     }
   };
 
@@ -105,22 +257,26 @@ export default function ArtworkDetails() {
 
       setComments((prev) => [savedComment, ...prev]);
       setNewComment("");
+      showToast("Review committed to the gallery thread!", "success");
     } catch (err: any) {
-      console.error("Failed to commit thought log entry to server database:", err);
-      alert(err.message || "Access Denied: Only authenticated collectors who have purchased this artwork can leave reviews.");
+      console.error("Failed to save thread review log entry:", err);
+      alert(err.message || "Access Denied: Only authenticated collectors who purchased this artwork can leave reviews.");
     }
   };
 
   const handleStartEdit = (commentId: string, currentText: string) => {
     setEditingCommentId(commentId);
     setEditText(currentText);
+    setIsEditModalOpen(true);
   };
 
-  const handleSaveEdit = async (commentId: string) => {
-    if (!editText.trim() || !user?.id) return;
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editText.trim() || !user?.id || !editingCommentId) return;
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/artworks/${id}/comments/${commentId}`, {
+      setIsSavingEdit(true);
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/artworks/${id}/comments/${editingCommentId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: user.id, comment: editText.trim() })
@@ -128,16 +284,21 @@ export default function ArtworkDetails() {
 
       if (!response.ok) {
         const errData = await response.json();
-        alert(errData.message || "Could not save your changes.");
+        alert(errData.message || "Could not update your statement review changes.");
         return;
       }
       
       setComments((prev) =>
-        prev.map((c) => (c._id === commentId ? { ...c, comment: editText.trim() } : c))
+        prev.map((c) => (c._id === editingCommentId ? { ...c, comment: editText.trim() } : c))
       );
+      
+      setIsEditModalOpen(false);
       setEditingCommentId(null);
+      showToast("Your canvas thread note has been updated.", "success");
     } catch (err) {
       console.error("Failed to save comment edits:", err);
+    } finally {
+      setIsSavingEdit(false);
     }
   };
 
@@ -158,6 +319,7 @@ export default function ArtworkDetails() {
       }
 
       setComments((prev) => prev.filter((c) => c._id !== commentId));
+      showToast("Comment successfully dropped.", "info");
     } catch (err) {
       console.error("Failed to remove comment entry:", err);
     }
@@ -169,10 +331,22 @@ export default function ArtworkDetails() {
       return;
     }
     await handleWishlistToggle(id as string);
+    if (!isWishlisted) {
+      showToast(`"${artwork?.name || 'Masterpiece'}" added to your vault wishlist!`, "success");
+    } else {
+      showToast(`Removed "${artwork?.name || 'Masterpiece'}" from your wishlist.`, "info");
+    }
   };
 
-  const isArtistOwner = artwork && user && user.id === artwork.artist?._id;
+  // Check ownership matches based on backend controller payload parsing strings
+  const isArtistOwner = artwork && user && (user.id === artwork.artist?._id || user.id === artwork.artist);
   const isPurchaseDisabled = artwork?.status === "sold" || isArtistOwner || paymentLoading;
+
+  // Helper function to extract a clean string ID representing the artist resource safely
+  const getArtistId = () => {
+    if (!artwork || !artwork.artist) return "";
+    return typeof artwork.artist === "object" ? artwork.artist._id : artwork.artist;
+  };
 
   if (loading) {
     return (
@@ -198,7 +372,7 @@ export default function ArtworkDetails() {
           <span className="text-4xl">🔍</span>
           <h1 className="text-2xl font-black uppercase tracking-tight mt-4">Artwork Not Found</h1>
           <p className="text-sm opacity-70 mt-2 leading-relaxed">
-            The masterpiece you are searching for has dissolved into thin air, or the item identifier string is broken.
+            The masterpiece has dissolved into thin air, or the collection identifier query link string is broken.
           </p>
           <Link href="/browse" className="mt-6 inline-block font-black uppercase tracking-wider text-[10px] bg-[#3D2B1F] text-[#FDFBF7] px-6 py-3 rounded-full hover:bg-[#8A9A5B] transition-colors">
             Return to Gallery
@@ -210,8 +384,253 @@ export default function ArtworkDetails() {
 
   return (
     <main className="min-h-screen bg-[#FDFBF7] text-[#3D2B1F] pt-36 pb-20 px-6 overflow-hidden">
+      {/* Toast Notification Element */}
+      <AnimatePresence>
+        {toastMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: -50, scale: 0.9, x: "-50%" }}
+            animate={{ opacity: 1, y: 0, scale: 1, x: "-50%" }}
+            exit={{ opacity: 0, y: -20, scale: 0.9, x: "-50%" }}
+            transition={{ type: "spring", stiffness: 300, damping: 25 }}
+            className="fixed top-28 left-1/2 z-50 flex items-center gap-2.5 px-5 py-3 rounded-full shadow-xl border backdrop-blur-md font-sans text-xs font-black uppercase tracking-wider text-[#3D2B1F]"
+            style={{
+              backgroundColor: toastType === "success" ? "rgba(138, 154, 91, 0.15)" : toastType === "info" ? "rgba(226, 180, 189, 0.25)" : "rgba(185, 28, 28, 0.15)",
+              borderColor: toastType === "success" ? "#8A9A5B" : toastType === "info" ? "#E2B4BD" : "#B91C1C",
+            }}
+          >
+            <Heart size={14} className={toastType === "success" ? "text-[#8A9A5B]" : toastType === "info" ? "text-[#E2B4BD]" : "text-red-700"} fill={toastType === "success" ? "currentColor" : "none"} />
+            <span>{toastMessage}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* DYNAMIC COMMENT EDITING MODAL */}
+      <AnimatePresence>
+        {isEditModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsEditModalOpen(false)}
+              className="absolute inset-0 bg-[#3D2B1F]/30 backdrop-blur-sm"
+            />
+
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ type: "spring", duration: 0.4 }}
+              className="relative w-full max-w-md bg-[#FDFBF7] border-2 border-[#3D2B1F]/10 rounded-[2.5rem] p-6 shadow-2xl z-10 overflow-hidden"
+            >
+              <div className="absolute top-0 left-0 w-32 h-32 bg-[#8A9A5B]/10 rounded-full blur-2xl pointer-events-none" />
+              
+              <div className="flex justify-between items-center mb-4 relative">
+                <div className="flex items-center gap-2">
+                  <Edit size={14} className="text-[#8A9A5B]" />
+                  <h3 className="text-xs font-black uppercase tracking-[0.2em]">Revise Canvas Thought</h3>
+                </div>
+                <button 
+                  type="button"
+                  onClick={() => setIsEditModalOpen(false)}
+                  className="p-1.5 rounded-full hover:bg-[#3D2B1F]/5 transition-colors text-[#3D2B1F]/70"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveEdit} className="space-y-4 relative">
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black uppercase tracking-widest text-[#3D2B1F]/60 pl-1">
+                    Your Statement Note
+                  </label>
+                  <textarea
+                    rows={4}
+                    value={editText}
+                    onChange={(e) => setEditText(e.target.value)}
+                    placeholder="Refine your collector review details..."
+                    required
+                    className="w-full bg-[#3D2B1F]/5 border-2 border-transparent focus:border-[#8A9A5B] rounded-2xl p-4 text-xs font-medium text-[#3D2B1F] outline-none resize-none transition-colors"
+                    autoFocus
+                  />
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setIsEditModalOpen(false)}
+                    className="flex-1 bg-[#3D2B1F]/5 text-[#3D2B1F] font-black text-[10px] uppercase tracking-widest py-3 rounded-full hover:bg-[#3D2B1F]/10 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSavingEdit || !editText.trim()}
+                    className="flex-1 bg-[#3D2B1F] text-[#FDFBF7] font-black text-[10px] uppercase tracking-widest py-3 rounded-full hover:bg-[#8A9A5B] transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+                  >
+                    {isSavingEdit ? "Saving..." : (
+                      <>
+                        Save Changes <Check size={12} />
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* DYNAMIC CORE ARTWORK DATA EDITING MODAL (Connected to Database) */}
+      <AnimatePresence>
+        {isArtEditModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsArtEditModalOpen(false)}
+              className="absolute inset-0 bg-[#3D2B1F]/30 backdrop-blur-sm"
+            />
+
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ type: "spring", duration: 0.4 }}
+              className="relative w-full max-w-md bg-[#FDFBF7] border-2 border-[#3D2B1F]/10 rounded-[2.5rem] p-6 shadow-2xl z-10 overflow-hidden text-[#3D2B1F]"
+            >
+              <div className="absolute top-0 right-0 w-32 h-32 bg-[#E2B4BD]/10 rounded-full blur-2xl pointer-events-none" />
+
+              <div className="flex justify-between items-center mb-4 relative">
+                <div className="flex items-center gap-2">
+                  <Paintbrush size={14} className="text-[#8A9A5B]" />
+                  <h3 className="text-xs font-black uppercase tracking-[0.2em]">Update Masterpiece Configuration</h3>
+                </div>
+                <button 
+                  type="button"
+                  onClick={() => setIsArtEditModalOpen(false)}
+                  className="p-1.5 rounded-full hover:bg-[#3D2B1F]/5 transition-colors text-[#3D2B1F]/70"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveArtworkEdit} className="space-y-4 relative">
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black uppercase tracking-widest text-[#3D2B1F]/60 pl-1">Artwork Title (Name)</label>
+                  <input
+                    type="text"
+                    value={artFormData.name}
+                    onChange={(e) => setArtFormData({...artFormData, name: e.target.value})}
+                    required
+                    className="w-full bg-[#3D2B1F]/5 border-2 border-transparent focus:border-[#8A9A5B] rounded-2xl p-3.5 text-xs font-medium text-[#3D2B1F] outline-none transition-colors"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black uppercase tracking-widest text-[#3D2B1F]/60 pl-1">Price (৳ BDT)</label>
+                    <input
+                      type="number"
+                      value={artFormData.price}
+                      onChange={(e) => setArtFormData({...artFormData, price: Number(e.target.value)})}
+                      required
+                      min="0"
+                      className="w-full bg-[#3D2B1F]/5 border-2 border-transparent focus:border-[#8A9A5B] rounded-2xl p-3.5 text-xs font-mono text-[#3D2B1F] outline-none transition-colors"
+                    />
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black uppercase tracking-widest text-[#3D2B1F]/60 pl-1">Category Select</label>
+                    <select
+                      value={artFormData.category}
+                      onChange={(e) => setArtFormData({...artFormData, category: e.target.value})}
+                      className="w-full bg-[#3D2B1F]/5 border-2 border-transparent focus:border-[#8A9A5B] rounded-2xl p-3.5 text-xs font-medium text-[#3D2B1F] outline-none transition-colors appearance-none"
+                    >
+                      {["Canvas", "Paper", "Painting", "Acrylic Art", "Sculpture", "Photography"].map((cat) => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* NEW: Grid Row for Tag and Status Selector Fields */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black uppercase tracking-widest text-[#3D2B1F]/60 pl-1">Classification Sub-Tag</label>
+                    <input
+                      type="text"
+                      value={artFormData.tag}
+                      placeholder="e.g. Original Acrylic"
+                      onChange={(e) => setArtFormData({...artFormData, tag: e.target.value})}
+                      required
+                      className="w-full bg-[#3D2B1F]/5 border-2 border-transparent focus:border-[#8A9A5B] rounded-2xl p-3.5 text-xs font-medium text-[#3D2B1F] outline-none transition-colors"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black uppercase tracking-widest text-[#3D2B1F]/60 pl-1">Availability Status</label>
+                    <select
+                      value={artFormData.status}
+                      onChange={(e) => setArtFormData({...artFormData, status: e.target.value})}
+                      className="w-full bg-[#3D2B1F]/5 border-2 border-transparent focus:border-[#8A9A5B] rounded-2xl p-3.5 text-xs font-medium text-[#3D2B1F] outline-none transition-colors appearance-none"
+                    >
+                      <option value="available">Available</option>
+                      <option value="sold">Sold</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black uppercase tracking-widest text-[#3D2B1F]/60 pl-1">High-Res Image URL</label>
+                  <input
+                    type="url"
+                    value={artFormData.img}
+                    onChange={(e) => setArtFormData({...artFormData, img: e.target.value})}
+                    required
+                    className="w-full bg-[#3D2B1F]/5 border-2 border-transparent focus:border-[#8A9A5B] rounded-2xl p-3.5 text-xs font-mono text-[#3D2B1F] outline-none transition-colors"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black uppercase tracking-widest text-[#3D2B1F]/60 pl-1">Exhibition Description Notes</label>
+                  <textarea
+                    rows={3}
+                    value={artFormData.description}
+                    onChange={(e) => setArtFormData({...artFormData, description: e.target.value})}
+                    required
+                    className="w-full bg-[#3D2B1F]/5 border-2 border-transparent focus:border-[#8A9A5B] rounded-2xl p-4 text-xs font-medium text-[#3D2B1F] outline-none resize-none transition-colors"
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsArtEditModalOpen(false)}
+                    className="flex-1 bg-[#3D2B1F]/5 text-[#3D2B1F] font-black text-[10px] uppercase tracking-widest py-3.5 rounded-full hover:bg-[#3D2B1F]/10 transition-colors"
+                  >
+                    Discard
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSavingArtwork}
+                    className="flex-1 bg-[#3D2B1F] text-[#FDFBF7] font-black text-[10px] uppercase tracking-widest py-3.5 rounded-full hover:bg-[#8A9A5B] transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+                  >
+                    {isSavingArtwork ? (
+                      <>Saving <Loader2 className="animate-spin" size={12} /></>
+                    ) : (
+                      <>Commit Changes <Check size={12} /></>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       <div className="max-w-6xl mx-auto">
-        
         <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
           <Link href="/browse" className="inline-flex items-center gap-2 group font-black uppercase tracking-[0.2em] text-[10px] bg-[#3D2B1F]/5 hover:bg-[#3D2B1F]/10 px-4 py-2 rounded-full transition-all duration-300">
             <ArrowLeft size={14} className="transform group-hover:-translate-x-1 transition-transform" />
@@ -221,22 +640,39 @@ export default function ArtworkDetails() {
           {isArtistOwner && (
             <div className="flex items-center gap-2 bg-[#8A9A5B]/10 p-1.5 rounded-full border border-[#8A9A5B]/20">
               <span className="text-[9px] font-black uppercase tracking-wider text-[#8A9A5B] pl-3 pr-2">Your Studio Item:</span>
-              <button className="p-2 rounded-full bg-[#FDFBF7] text-[#3D2B1F] hover:bg-[#E2B4BD] shadow-sm transition-colors" title="Edit Masterpiece">
+              <button 
+                type="button"
+                onClick={() => {
+                  setArtFormData({
+                    name: artwork.name || "",
+                    price: artwork.price || 0,
+                    category: artwork.category || "Painting",
+                    tag: artwork.tag || "",
+                    description: artwork.description || "",
+                    img: artwork.img || "",
+                    status: artwork.status || "available"
+                  });
+                  setIsArtEditModalOpen(true);
+                }}
+                className="p-2 rounded-full bg-[#FDFBF7] text-[#3D2B1F] hover:bg-[#E2B4BD] shadow-sm transition-colors" 
+                title="Edit Masterpiece Details"
+              >
                 <Edit size={14} />
               </button>
               <button 
-                onClick={() => { if(confirm("Are you sure you want to burn this artwork from the vault?")) alert("Deleted!"); }}
-                className="p-2 rounded-full bg-[#3D2B1F] text-[#FDFBF7] hover:bg-red-700 shadow-sm transition-colors" 
-                title="Destroy Masterpiece"
+                type="button"
+                disabled={isDeletingArtwork}
+                onClick={handleDeleteArtwork}
+                className="p-2 rounded-full bg-[#3D2B1F] text-[#FDFBF7] hover:bg-red-700 shadow-sm transition-colors disabled:opacity-50" 
+                title="Burn Listing from Repository"
               >
-                <Trash2 size={14} />
+                {isDeletingArtwork ? <Loader2 className="animate-spin" size={14} /> : <Trash2 size={14} />}
               </button>
             </div>
           )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
-          
           <div className="lg:col-span-7 flex justify-center relative sticky top-36">
             <div className="absolute -top-12 -left-12 w-72 h-72 bg-[#E2B4BD]/20 rounded-full blur-3xl pointer-events-none" />
             
@@ -257,7 +693,7 @@ export default function ArtworkDetails() {
                   <img src={artwork.img} alt={artwork.name} className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center font-bold text-sm text-[#3D2B1F]/40 italic">
-                    [ Cloud Image Source: {artwork.name} ]
+                    [ No Exhibition Asset Rendered ]
                   </div>
                 )}
               </motion.div>
@@ -281,14 +717,14 @@ export default function ArtworkDetails() {
               <h1 className="text-4xl md:text-5xl font-black font-sans uppercase tracking-tight text-[#3D2B1F]">
                 {artwork.name}
               </h1>
-              {artwork.bengaliTitle && (
-                <h2 className="text-2xl font-bold font-bengali text-[#E2B4BD] mt-1">{artwork.bengaliTitle}</h2>
-              )}
               
               <p className="text-xs font-bold tracking-wider opacity-60 mt-2 uppercase">
-                Artist:{" "}
-                <Link href={`/browse?artist=${artwork.artist?._id}`} className="text-[#8A9A5B] hover:underline underline-offset-4 decoration-2">
-                  {artwork.artist?.name || "Independent Artist"}
+                Artist Desk:{" "}
+                <Link 
+                  href={getArtistId() ? `/artists/${getArtistId()}` : "/browse"} 
+                  className="text-[#8A9A5B] hover:underline underline-offset-4 decoration-2"
+                >
+                  {typeof artwork.artist === 'object' ? artwork.artist?.name : "Independent Artist"}
                 </Link>
               </p>
             </div>
@@ -297,21 +733,19 @@ export default function ArtworkDetails() {
               <span className="text-3xl font-black tracking-tight font-sans">
                 ৳{artwork.price?.toLocaleString("bn-BD")}
               </span>
-              <span className="text-[10px] font-black tracking-widest text-[#E2B4BD] uppercase">BDT / Fixed Price</span>
+              <span className="text-[10px] font-black tracking-widest text-[#E2B4BD] uppercase">BDT / Fixed Rate</span>
             </div>
 
             <div className="grid grid-cols-2 gap-3 bg-[#3D2B1F]/5 p-4 rounded-[2rem] border border-[#3D2B1F]/5">
               <div className="bg-[#FDFBF7] p-3 rounded-[1.2rem] text-center shadow-sm flex flex-col items-center justify-center">
-                <Tag size={12} className="text-[#8A9A5B] mb-1" />
-                <p className="text-[8px] font-black uppercase tracking-wider text-[#3D2B1F]/50">Classification</p>
-                <p className="text-xs font-bold mt-0.5">{artwork.tag || "Fine Art"}</p>
+                <Layers size={12} className="text-[#8A9A5B] mb-1" />
+                <p className="text-[8px] font-black uppercase tracking-wider text-[#3D2B1F]/50">Category</p>
+                <p className="text-xs font-bold mt-0.5">{artwork.category || "General Painting"}</p>
               </div>
               <div className="bg-[#FDFBF7] p-3 rounded-[1.2rem] text-center shadow-sm flex flex-col items-center justify-center">
-                <Calendar size={12} className="text-[#E2B4BD] mb-1" />
-                <p className="text-[8px] font-black uppercase tracking-wider text-[#3D2B1F]/50">Vault Release</p>
-                <p className="text-xs font-bold mt-0.5">
-                  {artwork.createdAt ? new Date(artwork.createdAt).toLocaleDateString("en-GB") : "Recent"}
-                </p>
+                <Tag size={12} className="text-[#E2B4BD] mb-1" />
+                <p className="text-[8px] font-black uppercase tracking-wider text-[#3D2B1F]/50">Sub-Classification</p>
+                <p className="text-xs font-bold mt-0.5">{artwork.tag || "Fine Art Layout"}</p>
               </div>
             </div>
 
@@ -362,28 +796,23 @@ export default function ArtworkDetails() {
 
               {isArtistOwner && (
                 <p className="text-[10px] text-center font-bold text-red-700/70 tracking-wide mt-1">
-                  ⚠️ System Protection: Artists cannot purchase their own portfolio listings.
+                  ⚠️ System Rule Protection: Listing creators cannot purchase items from their own portfolio.
                 </p>
               )}
             </div>
 
-            <div className="flex items-center justify-center gap-6 mt-2 opacity-50 text-[10px] font-black uppercase tracking-widest text-center">
-              <div className="flex items-center gap-1.5"><ShieldCheck size={14} /> Authenticated Contract</div>
-              <div className="flex items-center gap-1.5"><Sparkles size={14} /> Courier Protection</div>
-            </div>
-
             <hr className="border-[#3D2B1F]/10 my-4" />
             
+            {/* DISCUSSION FORUM ELEMENTS */}
             <div className="space-y-4">
               <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[#3D2B1F] flex items-center gap-2">
                 <MessageSquare size={14} /> Gallery Dialogue ({comments.length})
               </h3>
 
-              {/* RENDER DYNAMIC ACCESS CONDITIONALS */}
               {!user ? (
                 <div className="text-center p-4 rounded-2xl bg-[#3D2B1F]/5 border border-dashed border-[#3D2B1F]/10">
                   <p className="text-[10px] font-bold opacity-60 uppercase tracking-wider">
-                    You must be logged in to participate in the conversation.
+                    Log in to drop thread insights.
                   </p>
                   <Link href="/login" className="inline-block text-[9px] font-black uppercase text-[#8A9A5B] hover:underline mt-1">
                     Sign In to Account →
@@ -395,7 +824,7 @@ export default function ArtworkDetails() {
                     <ShieldCheck size={12} /> Exclusive Collector Circle
                   </div>
                   <p className="text-[10px] font-medium opacity-60 max-w-sm mt-0.5">
-                    Only verified collectors who acquired this canvas can post reviews.
+                    Only verified collectors who acquired this canvas listing can leave insight review marks.
                   </p>
                 </div>
               ) : (
@@ -420,7 +849,6 @@ export default function ArtworkDetails() {
                 <AnimatePresence initial={false}>
                   {comments.map((comment) => {
                     const isCommentOwner = user && user.id === comment.userId;
-                    const isEditingThis = editingCommentId === comment._id;
 
                     return (
                       <motion.div 
@@ -442,9 +870,10 @@ export default function ArtworkDetails() {
                               {comment.createdAt ? new Date(comment.createdAt).toLocaleDateString("en-GB") : "Recent"}
                             </span>
 
-                            {isCommentOwner && !isEditingThis && (
+                            {isCommentOwner && (
                               <div className="flex items-center gap-1 opacity-0 group-hover/item:opacity-100 transition-opacity duration-200">
                                 <button 
+                                  type="button"
                                   onClick={() => handleStartEdit(comment._id, comment.comment)}
                                   className="text-[#3D2B1F]/50 hover:text-[#8A9A5B] transition-colors p-0.5"
                                   title="Edit Thought"
@@ -452,6 +881,7 @@ export default function ArtworkDetails() {
                                   <Edit size={10} />
                                 </button>
                                 <button 
+                                  type="button"
                                   onClick={() => handleDeleteComment(comment._id)}
                                   className="text-[#3D2B1F]/50 hover:text-red-700 transition-colors p-0.5"
                                   title="Delete Thought"
@@ -463,33 +893,9 @@ export default function ArtworkDetails() {
                           </div>
                         </div>
 
-                        {isEditingThis ? (
-                          <div className="flex gap-1.5 items-center mt-2 bg-[#FDFBF7] p-1 rounded-xl border border-[#3D2B1F]/10">
-                            <input
-                              type="text"
-                              value={editText}
-                              onChange={(e) => setEditText(e.target.value)}
-                              className="flex-1 bg-transparent px-2 py-1 text-xs font-medium text-[#3D2B1F] focus:outline-none"
-                              autoFocus
-                            />
-                            <button 
-                              onClick={() => handleSaveEdit(comment._id)} 
-                              className="p-1 rounded-md bg-[#8A9A5B] text-[#FDFBF7] hover:bg-[#8A9A5B]/90 transition-colors"
-                            >
-                              <Check size={10} />
-                            </button>
-                            <button 
-                              onClick={() => setEditingCommentId(null)} 
-                              className="p-1 rounded-md bg-[#3D2B1F]/10 text-[#3D2B1F] hover:bg-[#3D2B1F]/20 transition-colors"
-                            >
-                              <X size={10} />
-                            </button>
-                          </div>
-                        ) : (
-                          <p className="text-xs font-medium opacity-80 leading-relaxed pl-7">
-                            {comment.comment}
-                          </p>
-                        )}
+                        <p className="text-xs font-medium opacity-80 leading-relaxed pl-7">
+                          {comment.comment}
+                        </p>
                       </motion.div>
                     );
                   })}
@@ -504,7 +910,6 @@ export default function ArtworkDetails() {
 
           </div>
         </div>
-
       </div>
     </main>
   );

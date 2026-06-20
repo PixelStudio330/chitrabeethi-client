@@ -40,8 +40,7 @@ export default function Header() {
   // Structural Navigation Tree Arrays
   const leftLinks = [
     { name: "Home", href: "/" },
-    { name: "Browse Artworks", href: "/browse" },
-    { name: "Order History", href: "/order-history" },
+    { name: "Browse Artworks", href: "/browse" }
   ];
 
   const isActive = (href: string) => pathname === href;
@@ -338,13 +337,6 @@ export default function Header() {
                   className={`text-3xl font-black uppercase flex justify-between items-center transition-colors ${isActive("/browse") ? "text-[#8A9A5B]" : "text-[#E2B4BD]"}`}
                 >
                   Browse Artworks <ArrowRight className="text-[#8A9A5B]" />
-                </Link>
-                <Link 
-                  href="/order-history" 
-                  onClick={() => setMobileMenuOpen(false)} 
-                  className={`text-3xl font-black uppercase flex justify-between items-center transition-colors ${isActive("/order-history") ? "text-[#8A9A5B]" : "text-[#E2B4BD]"}`}
-                >
-                  Order History <ArrowRight className="text-[#8A9A5B]" />
                 </Link>
                 
                 {user && (
