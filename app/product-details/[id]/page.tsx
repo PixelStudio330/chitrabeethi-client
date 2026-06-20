@@ -6,34 +6,29 @@ import { Heart, ShoppingBag, ArrowLeft, Sparkles, ShieldCheck, Paintbrush, Calen
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { getArtworkById, getCommentsByArtwork, postComment, ArtworkData, CommentData } from "../../../utils/api";
-import { useAuth } from "../../context/AuthContext"; // Dynamic user synchronization
-import { useSharedWishlist } from "../../../utils/WishlistContext"; // Shared global state hook
+import { useAuth } from "../../context/AuthContext"; 
+import { useSharedWishlist } from "../../../utils/WishlistContext"; 
 
 export default function ArtworkDetails() {
   const { id } = useParams();
   const router = useRouter();
   
-  // Dynamic Authentication Hook
   const { user } = useAuth();
-
-  // Shared Global Wishlist Core Context
   const { wishlist, handleWishlistToggle } = useSharedWishlist();
 
-  // Structural Core States linked to Database API Pipeline
   const [artwork, setArtwork] = useState<ArtworkData | null>(null);
   const [comments, setComments] = useState<CommentData[]>([]);
+  const [hasPurchased, setHasPurchased] = useState<boolean>(false); // Core restriction checker state
   const [newComment, setNewComment] = useState("");
   const [loading, setLoading] = useState(true);
   const [isZoomed, setIsZoomed] = useState(false);
+  const [paymentLoading, setPaymentLoading] = useState(false);
 
-  // --- EDITING STATES FOR USER CRUD CONTROL ---
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
 
-  // Derived state directly synchronized to the central store array
   const isWishlisted = wishlist.includes(id as string);
 
-  // --- LIFECYCLE CONNECTIVITY ENGINE ---
   useEffect(() => {
     if (!id) return;
 
@@ -41,37 +36,60 @@ export default function ArtworkDetails() {
       try {
         setLoading(true);
         
-        // 1. Fetch main document body details
         const artData = await getArtworkById(id as string);
         setArtwork(artData);
 
-        // 2. Fetch specific attached conversation stream logs
-        const fetchedData = await getCommentsByArtwork(id as string);
+        // Dispatches user.id directly to verify database records on load
+        const responseData = await getCommentsByArtwork(id as string, user?.id);
         
-        // Handle both raw arrays or enveloped object payloads gracefully
-        if (Array.isArray(fetchedData)) {
-          setComments(fetchedData);
-        } else if (fetchedData && Array.isArray(fetchedData.comments)) {
-          setComments(fetchedData.comments);
-        }
+        setComments(responseData.comments);
+        setHasPurchased(responseData.hasPurchased);
       } catch (err) {
         console.error("Database connection failure on resource lookup:", err);
         setArtwork(null);
       } finally {
-        loading && setLoading(false);
+        setLoading(false);
       }
     }
 
     loadArtworkDetails();
-  }, [id]);
+  }, [id, user?.id]); // Re-runs validation checks automatically if the user authentication state syncs up late
 
-  // --- ACTIONS ---
-  const handlePurchase = () => {
+  const handlePurchase = async () => {
     if (!user) {
       router.push("/login");
       return;
     }
-    console.log("Redirecting to Stripe Checkout for artwork:", artwork?._id);
+
+    try {
+      setPaymentLoading(true);
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/payments/create-artwork-checkout`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          artworkId: artwork?._id,
+          userId: user.id,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        alert(data.message || "Failed to initialize secure checkout session.");
+        return;
+      }
+
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    } catch (err) {
+      console.error("Critical failure initializing Stripe Checkout engine:", err);
+      alert("Could not connect to the transaction gate. Please check terminal logs.");
+    } finally {
+      setPaymentLoading(false);
+    }
   };
 
   const handlePostComment = async (e: React.FormEvent) => {
@@ -79,18 +97,17 @@ export default function ArtworkDetails() {
     if (!newComment.trim() || !artwork || !user?.id) return;
 
     try {
-      // Direct integration call executing write sequence to server
-      // Synchronized to pass structural body requirements matching schema criteria
       const savedComment = await postComment(artwork._id, {
         userId: user.id,
         userName: user.name || "Anonymous Collector",
-        comment: newComment.trim() // Payload property matches schema string field directly
+        comment: newComment.trim()
       });
 
       setComments((prev) => [savedComment, ...prev]);
       setNewComment("");
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to commit thought log entry to server database:", err);
+      alert(err.message || "Access Denied: Only authenticated collectors who have purchased this artwork can leave reviews.");
     }
   };
 
@@ -103,8 +120,17 @@ export default function ArtworkDetails() {
     if (!editText.trim() || !user?.id) return;
 
     try {
-      // Optional optimization: Insert API dynamic PUT call path here later
-      // fetch(`/api/artworks/${id}/comments/${commentId}`, { method: 'PUT', body: JSON.stringify({ userId: user.id, comment: editText }) })
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/artworks/${id}/comments/${commentId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id, comment: editText.trim() })
+      });
+
+      if (!response.ok) {
+        const errData = await response.json();
+        alert(errData.message || "Could not save your changes.");
+        return;
+      }
       
       setComments((prev) =>
         prev.map((c) => (c._id === commentId ? { ...c, comment: editText.trim() } : c))
@@ -119,9 +145,18 @@ export default function ArtworkDetails() {
     if (!user?.id || !confirm("Are you certain you want to remove your comment?")) return;
 
     try {
-      // Optional optimization: Insert API dynamic DELETE call path here later
-      // fetch(`/api/artworks/${id}/comments/${commentId}`, { method: 'DELETE', body: JSON.stringify({ userId: user.id }) })
-      
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/artworks/${id}/comments/${commentId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id })
+      });
+
+      if (!response.ok) {
+        const errData = await response.json();
+        alert(errData.message || "Failed to drop comment resource.");
+        return;
+      }
+
       setComments((prev) => prev.filter((c) => c._id !== commentId));
     } catch (err) {
       console.error("Failed to remove comment entry:", err);
@@ -136,13 +171,9 @@ export default function ArtworkDetails() {
     await handleWishlistToggle(id as string);
   };
 
-  // --- VALIDATION FLAGS ---
   const isArtistOwner = artwork && user && user.id === artwork.artist?._id;
-  const isPurchaseDisabled = artwork?.status === "sold" || isArtistOwner;
+  const isPurchaseDisabled = artwork?.status === "sold" || isArtistOwner || paymentLoading;
 
-  // ==========================================
-  // 1. STATE BOUNDARY: SKELETON LOADING
-  // ==========================================
   if (loading) {
     return (
       <div className="min-h-screen bg-[#FDFBF7] pt-36 px-6 max-w-6xl mx-auto animate-pulse">
@@ -160,9 +191,6 @@ export default function ArtworkDetails() {
     );
   }
 
-  // ==========================================
-  // 2. STATE BOUNDARY: NOT FOUND EXCEPTION
-  // ==========================================
   if (!artwork) {
     return (
       <main className="min-h-screen bg-[#FDFBF7] text-[#3D2B1F] flex flex-col items-center justify-center p-6 text-center">
@@ -180,21 +208,16 @@ export default function ArtworkDetails() {
     );
   }
 
-  // ==========================================
-  // 3. MAIN INTERFACE RENDER
-  // ==========================================
   return (
     <main className="min-h-screen bg-[#FDFBF7] text-[#3D2B1F] pt-36 pb-20 px-6 overflow-hidden">
       <div className="max-w-6xl mx-auto">
         
-        {/* TOP INTERACTION LINE */}
         <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
           <Link href="/browse" className="inline-flex items-center gap-2 group font-black uppercase tracking-[0.2em] text-[10px] bg-[#3D2B1F]/5 hover:bg-[#3D2B1F]/10 px-4 py-2 rounded-full transition-all duration-300">
             <ArrowLeft size={14} className="transform group-hover:-translate-x-1 transition-transform" />
             Back to Gallery
           </Link>
 
-          {/* DYNAMIC ARTIST MANAGED SYSTEM PANEL */}
           {isArtistOwner && (
             <div className="flex items-center gap-2 bg-[#8A9A5B]/10 p-1.5 rounded-full border border-[#8A9A5B]/20">
               <span className="text-[9px] font-black uppercase tracking-wider text-[#8A9A5B] pl-3 pr-2">Your Studio Item:</span>
@@ -212,10 +235,8 @@ export default function ArtworkDetails() {
           )}
         </div>
 
-        {/* --- CORE PRODUCT GRID --- */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
           
-          {/* IMAGE PREVIEW FRAME BLOCK */}
           <div className="lg:col-span-7 flex justify-center relative sticky top-36">
             <div className="absolute -top-12 -left-12 w-72 h-72 bg-[#E2B4BD]/20 rounded-full blur-3xl pointer-events-none" />
             
@@ -236,7 +257,7 @@ export default function ArtworkDetails() {
                   <img src={artwork.img} alt={artwork.name} className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center font-bold text-sm text-[#3D2B1F]/40 italic">
-                    [ imgBB Cloud Image Source: {artwork.name} ]
+                    [ Cloud Image Source: {artwork.name} ]
                   </div>
                 )}
               </motion.div>
@@ -249,7 +270,6 @@ export default function ArtworkDetails() {
             </motion.div>
           </div>
 
-          {/* META DESCRIPTION INFO COLUMN */}
           <div className="lg:col-span-5 flex flex-col gap-6">
             <div>
               <div className="flex items-center gap-2 mb-2">
@@ -273,7 +293,6 @@ export default function ArtworkDetails() {
               </p>
             </div>
 
-            {/* Price tag Capsule */}
             <div className="inline-flex items-baseline gap-3 bg-[#3D2B1F] text-[#FDFBF7] p-5 rounded-[2rem] shadow-lg w-fit pr-10">
               <span className="text-3xl font-black tracking-tight font-sans">
                 ৳{artwork.price?.toLocaleString("bn-BD")}
@@ -281,7 +300,6 @@ export default function ArtworkDetails() {
               <span className="text-[10px] font-black tracking-widest text-[#E2B4BD] uppercase">BDT / Fixed Price</span>
             </div>
 
-            {/* Meta tags Pill Group */}
             <div className="grid grid-cols-2 gap-3 bg-[#3D2B1F]/5 p-4 rounded-[2rem] border border-[#3D2B1F]/5">
               <div className="bg-[#FDFBF7] p-3 rounded-[1.2rem] text-center shadow-sm flex flex-col items-center justify-center">
                 <Tag size={12} className="text-[#8A9A5B] mb-1" />
@@ -297,12 +315,10 @@ export default function ArtworkDetails() {
               </div>
             </div>
 
-            {/* Poetic Description Text */}
             <p className="text-sm font-medium leading-relaxed text-[#3D2B1F]/80 pl-4 border-l-2 border-[#E2B4BD]">
               "{artwork.description}"
             </p>
 
-            {/* --- CORE PURCHASE UTILITY ACTION --- */}
             <div className="flex flex-col gap-2 mt-2">
               <div className="flex gap-4">
                 <motion.button 
@@ -321,9 +337,11 @@ export default function ArtworkDetails() {
                       ? "Artwork Sold Out" 
                       : isArtistOwner 
                         ? "You Own This Piece" 
-                        : user 
-                          ? "Acquire via Stripe" 
-                          : "Log In to Acquire"}
+                        : paymentLoading
+                          ? "Securing Session..."
+                          : user 
+                            ? "Buy Now" 
+                            : "Log In to Acquire"}
                   </span>
                   <ShoppingBag size={16} strokeWidth={2.5} />
                 </motion.button>
@@ -344,7 +362,7 @@ export default function ArtworkDetails() {
 
               {isArtistOwner && (
                 <p className="text-[10px] text-center font-bold text-red-700/70 tracking-wide mt-1">
-                  ⚠️ System Protection: Artists cannot purchase their own registered portfolio listings.
+                  ⚠️ System Protection: Artists cannot purchase their own portfolio listings.
                 </p>
               )}
             </div>
@@ -354,7 +372,6 @@ export default function ArtworkDetails() {
               <div className="flex items-center gap-1.5"><Sparkles size={14} /> Courier Protection</div>
             </div>
 
-            {/* --- PUBLIC FEEDBACK & COMMENT HOOK --- */}
             <hr className="border-[#3D2B1F]/10 my-4" />
             
             <div className="space-y-4">
@@ -362,24 +379,8 @@ export default function ArtworkDetails() {
                 <MessageSquare size={14} /> Gallery Dialogue ({comments.length})
               </h3>
 
-              {user ? (
-                <form onSubmit={handlePostComment} className="flex gap-2 items-center bg-[#3D2B1F]/5 p-2 rounded-full border border-[#3D2B1F]/5">
-                  {/* Decorative Initials Avatar matching cozy theme */}
-                  <div className="w-7 h-7 bg-[#E2B4BD] text-[#3D2B1F] font-black text-[9px] rounded-full flex items-center justify-center uppercase shadow-sm">
-                    {user.name ? user.name.substring(0, 2) : "ME"}
-                  </div>
-                  <input 
-                    type="text" 
-                    placeholder="Leave a thought on this canvas..." 
-                    value={newComment}
-                    onChange={(e) => setNewComment(e.target.value)}
-                    className="flex-1 bg-transparent px-3 py-2 text-xs font-medium focus:outline-none placeholder-[#3D2B1F]/40 text-[#3D2B1F]"
-                  />
-                  <button type="submit" className="p-2 rounded-full bg-[#3D2B1F] text-[#FDFBF7] hover:bg-[#8A9A5B] transition-colors">
-                    <Send size={12} />
-                  </button>
-                </form>
-              ) : (
+              {/* RENDER DYNAMIC ACCESS CONDITIONALS */}
+              {!user ? (
                 <div className="text-center p-4 rounded-2xl bg-[#3D2B1F]/5 border border-dashed border-[#3D2B1F]/10">
                   <p className="text-[10px] font-bold opacity-60 uppercase tracking-wider">
                     You must be logged in to participate in the conversation.
@@ -388,9 +389,33 @@ export default function ArtworkDetails() {
                     Sign In to Account →
                   </Link>
                 </div>
+              ) : (!hasPurchased && !isArtistOwner) ? (
+                <div className="text-center p-4 rounded-2xl bg-[#3D2B1F]/5 border border-[#3D2B1F]/10 flex flex-col items-center justify-center gap-1">
+                  <div className="flex items-center gap-1 text-[#8A9A5B] font-black uppercase tracking-wider text-[9px]">
+                    <ShieldCheck size={12} /> Exclusive Collector Circle
+                  </div>
+                  <p className="text-[10px] font-medium opacity-60 max-w-sm mt-0.5">
+                    Only verified collectors who acquired this canvas can post reviews.
+                  </p>
+                </div>
+              ) : (
+                <form onSubmit={handlePostComment} className="flex gap-2 items-center bg-[#3D2B1F]/5 p-2 rounded-full border border-[#3D2B1F]/5">
+                  <div className="w-7 h-7 bg-[#E2B4BD] text-[#3D2B1F] font-black text-[9px] rounded-full flex items-center justify-center uppercase shadow-sm">
+                    {user.name ? user.name.substring(0, 2) : "ME"}
+                  </div>
+                  <input 
+                    type="text" 
+                    placeholder={isArtistOwner ? "Moderate studio discussion..." : "Leave a collector review on this canvas..."} 
+                    value={newComment}
+                    onChange={(e) => setNewComment(e.target.value)}
+                    className="flex-1 bg-transparent px-3 py-2 text-xs font-medium focus:outline-none placeholder-[#3D2B1F]/40 text-[#3D2B1F]"
+                  />
+                  <button type="submit" className="p-2 rounded-full bg-[#3D2B1F] text-[#FDFBF7] hover:bg-[#8A9A5B] transition-colors">
+                    <Send size={12} />
+                  </button>
+                </form>
               )}
 
-              {/* Feed Display Thread */}
               <div className="space-y-3 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
                 <AnimatePresence initial={false}>
                   {comments.map((comment) => {
@@ -399,7 +424,7 @@ export default function ArtworkDetails() {
 
                     return (
                       <motion.div 
-                        key={comment._id || comment.id}
+                        key={comment._id}
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0 }}
@@ -417,7 +442,6 @@ export default function ArtworkDetails() {
                               {comment.createdAt ? new Date(comment.createdAt).toLocaleDateString("en-GB") : "Recent"}
                             </span>
 
-                            {/* CONDITIONAL CRUD ACTION UTILITIES */}
                             {isCommentOwner && !isEditingThis && (
                               <div className="flex items-center gap-1 opacity-0 group-hover/item:opacity-100 transition-opacity duration-200">
                                 <button 
@@ -439,7 +463,6 @@ export default function ArtworkDetails() {
                           </div>
                         </div>
 
-                        {/* RENDER VIEW FIELD VS RENDER LIVE INLINE EDIT BOX */}
                         {isEditingThis ? (
                           <div className="flex gap-1.5 items-center mt-2 bg-[#FDFBF7] p-1 rounded-xl border border-[#3D2B1F]/10">
                             <input
