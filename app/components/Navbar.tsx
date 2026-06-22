@@ -43,6 +43,14 @@ export default function Header() {
     { name: "Browse Artworks", href: "/browse" }
   ];
 
+  // 🌟 DYNAMIC PROFILE PATH LOGIC
+  // Artists go to /profile/artist/[id]/ while users/admins go to /profile
+  const getProfileHref = () => {
+    if (!user) return "/profile";
+    return user.role === "artist" ? `/profile/artist/${user._id || user.id}/` : "/profile";
+  };
+
+  const dynamicProfileHref = getProfileHref();
   const isActive = (href: string) => pathname === href;
 
   return (
@@ -259,7 +267,8 @@ export default function Header() {
                   </div>
                   
                   <div className="relative w-11 h-11 md:w-12 md:h-12 mt-6 md:mt-0 flex items-center justify-center">
-                    <Link href="/profile" className="block w-full h-full rounded-full border-2 border-[#8A9A5B] bg-[#3D2B1F] flex items-center justify-center overflow-hidden transition-transform duration-300 hover:scale-105 shadow-md">
+                    {/* 🌟 FIXED: Target updated to use dynamic profile route based on layout needs */}
+                    <Link href={dynamicProfileHref} className="block w-full h-full rounded-full border-2 border-[#8A9A5B] bg-[#3D2B1F] flex items-center justify-center overflow-hidden transition-transform duration-300 hover:scale-105 shadow-md">
                       {(user.profilePicture || user.photoUrl) ? (
                         <img 
                           src={`/api/proxy-avatar?url=${encodeURIComponent(user.profilePicture || user.photoUrl)}`} 
@@ -348,10 +357,11 @@ export default function Header() {
                     >
                       Dashboard <ArrowRight className="text-[#8A9A5B]" />
                     </Link>
+                    {/* 🌟 FIXED: Mobile drawer profile anchor altered for correct dynamic structural layout */}
                     <Link 
-                      href="/profile"
+                      href={dynamicProfileHref}
                       onClick={() => setMobileMenuOpen(false)} 
-                      className={`text-3xl font-black uppercase flex justify-between items-center transition-colors ${isActive("/profile") ? "text-[#8A9A5B]" : "text-[#E2B4BD]"}`}
+                      className={`text-3xl font-black uppercase flex justify-between items-center transition-colors ${isActive(dynamicProfileHref) ? "text-[#8A9A5B]" : "text-[#E2B4BD]"}`}
                     >
                       My Profile <ArrowRight className="text-[#8A9A5B]" />
                     </Link>

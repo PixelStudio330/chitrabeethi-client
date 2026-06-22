@@ -88,6 +88,7 @@ export default function LoginPage() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  // --- 1. Your Original Dashboard Distribution (RESTORED) ---
   const handleRoleRedirection = (role: string) => {
     if (role === 'admin') {
       router.push('/dashboard/admin');
@@ -95,6 +96,15 @@ export default function LoginPage() {
       router.push('/dashboard/artist');
     } else {
       router.push('/');
+    }
+  };
+
+  // --- 2. Your New Profile Distribution Logic (ADDED) ---
+  const handleProfileRedirection = (role: string, userId: string) => {
+    if (role === 'artist') {
+      router.push(`/profile/artist/${userId}`);
+    } else {
+      router.push('/profile');
     }
   };
 
@@ -127,6 +137,9 @@ export default function LoginPage() {
         style: { background: "#FDFBF7", color: "#3D2B1F", borderRadius: "1rem", border: "2px solid #8A9A5B" },
       });
 
+      // 💡 CHOOSE YOUR LANDING DESTINATION ON LOGIN:
+      // To land on Dashboards: Leave as handleRoleRedirection(data.user.role)
+      // To land on Profiles instead: Swap it to handleProfileRedirection(data.user.role, data.user.id || data.user._id)
       handleRoleRedirection(data.user.role);
 
     } catch (err: any) {
@@ -266,6 +279,8 @@ export default function LoginPage() {
                       duration: 2500,
                       style: { background: "#FDFBF7", color: "#3D2B1F", borderRadius: "1rem", border: "2px solid #8A9A5B" },
                     });
+                    
+                    // Uses Dashboard redirect layout as primary setup
                     handleRoleRedirection(result.role);
                   } else {
                     toast.error(result.error || 'Google pipeline verification rejected.', {
@@ -281,7 +296,7 @@ export default function LoginPage() {
                   style: { background: '#FDFBF7', color: '#3D2B1F', borderRadius: '1rem', border: '2px solid #E2B4BD' }
                 });
               }}
-              theme="filled_black" // Blends with your deep chocolate surface
+              theme="filled_black"
               shape="pill"
               width="100%"
             />

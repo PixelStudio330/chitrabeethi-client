@@ -71,9 +71,32 @@ export default function ArtworkDetails() {
   useEffect(() => {
     if (!id) return;
 
+    // Capture the Stripe checkout session parameter from the URL if returning from a purchase
+    const urlParams = new URLSearchParams(window.location.search);
+    const stripeSessionId = urlParams.get("session_id");
+
     async function loadArtworkDetails() {
       try {
         setLoading(true);
+
+        // If arriving with a session_id, verify the payment with the backend immediately
+        if (stripeSessionId) {
+          try {
+            const verifyResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/payments/verify-payment`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ sessionId: stripeSessionId })
+            });
+            
+            if (verifyResponse.ok) {
+              showToast("Transaction captured and vaulted successfully!", "success");
+              // Clear URL query parameters cleanly so refreshing doesn't send duplicate requests
+              window.history.replaceState({}, document.title, window.location.pathname);
+            }
+          } catch (vErr) {
+            console.error("Manual verification handoff loop crashed:", vErr);
+          }
+        }
         
         const artData = await getArtworkById(id as string);
         setArtwork(artData);
@@ -555,7 +578,7 @@ export default function ArtworkDetails() {
                   </div>
                 </div>
 
-                {/* NEW: Grid Row for Tag and Status Selector Fields */}
+                {/* Grid Row for Tag and Status Selector Fields */}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <label className="text-[9px] font-black uppercase tracking-widest text-[#3D2B1F]/60 pl-1">Classification Sub-Tag</label>
@@ -566,7 +589,7 @@ export default function ArtworkDetails() {
                       onChange={(e) => setArtFormData({...artFormData, tag: e.target.value})}
                       required
                       className="w-full bg-[#3D2B1F]/5 border-2 border-transparent focus:border-[#8A9A5B] rounded-2xl p-3.5 text-xs font-medium text-[#3D2B1F] outline-none transition-colors"
-                    />
+                  />
                   </div>
 
                   <div className="space-y-1">
@@ -721,7 +744,7 @@ export default function ArtworkDetails() {
               <p className="text-xs font-bold tracking-wider opacity-60 mt-2 uppercase">
                 Artist Desk:{" "}
                 <Link 
-                  href={getArtistId() ? `/artists/${getArtistId()}` : "/browse"} 
+                  href={getArtistId() ? `/profile/artist/${getArtistId()}/` : "/browse"} 
                   className="text-[#8A9A5B] hover:underline underline-offset-4 decoration-2"
                 >
                   {typeof artwork.artist === 'object' ? artwork.artist?.name : "Independent Artist"}

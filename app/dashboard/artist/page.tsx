@@ -229,6 +229,15 @@ export default function ArtistDashboard() {
     router.push(`/product-details/${id}`);
   };
 
+  // Navigate back to the artist's updated nested public showcase layout view
+  const navigateToPublicProfile = () => {
+    if (user?.id) {
+      router.push(`/profile/artist/${user.id}`);
+    } else {
+      router.push("/browse");
+    }
+  };
+
   // --- COMPUTE VELOCITY METRICS MATRIX FROM DATABASE DATA ---
   const dynamicRevenue = artworks
     .filter(art => art.status === "sold")
@@ -267,14 +276,26 @@ export default function ArtistDashboard() {
             </h1>
           </div>
 
-          <motion.button
-            whileHover={{ scale: 1.05, y: -2 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={openAddModal}
-            className="bg-[#8A9A5B] text-[#FDFBF7] border-[3px] border-[#3D2B1F] shadow-[5px_5px_0px_0px_#3D2B1F] rounded-2xl text-xs font-black uppercase tracking-widest px-6 py-4 flex items-center gap-2 transition-all"
-          >
-            <Plus size={14} strokeWidth={3} /> Publish Masterpiece
-          </motion.button>
+          <div className="flex items-center gap-4 flex-wrap">
+            {/* Quick link button to view their own updated profile route live */}
+            <motion.button
+              whileHover={{ scale: 1.02, y: -1 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={navigateToPublicProfile}
+              className="bg-[#FDFBF7] text-[#3D2B1F] border-[3px] border-[#3D2B1F] rounded-2xl text-xs font-black uppercase tracking-widest px-5 py-4 flex items-center gap-2 transition-all hover:bg-[#3D2B1F]/5"
+            >
+              👁️ Live Gallery Profile
+            </motion.button>
+
+            <motion.button
+              whileHover={{ scale: 1.05, y: -2 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={openAddModal}
+              className="bg-[#8A9A5B] text-[#FDFBF7] border-[3px] border-[#3D2B1F] shadow-[5px_5px_0px_0px_#3D2B1F] rounded-2xl text-xs font-black uppercase tracking-widest px-6 py-4 flex items-center gap-2 transition-all"
+            >
+              <Plus size={14} strokeWidth={3} /> Publish Masterpiece
+            </motion.button>
+          </div>
         </div>
 
         {/* --- LIVE WORKSPACE STATISTICS STRIP --- */}
