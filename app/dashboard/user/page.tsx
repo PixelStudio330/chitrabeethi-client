@@ -15,7 +15,9 @@ import {
   Inbox,
   ShieldCheck,
   Tag,
-  Eye
+  Eye,
+  MessageSquare,
+  ArrowRight
 } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "../../context/AuthContext";
@@ -61,15 +63,27 @@ interface WishlistItemData {
   };
 }
 
+interface CommentData {
+  _id: string;
+  comment: string;
+  createdAt: string;
+  artworkId: {
+    _id: string;
+    name: string;
+    img?: string;
+  } | null;
+}
+
 export default function UserDashboard() {
   const { user } = useAuth();
   const router = useRouter();
 
   const [transactions, setTransactions] = useState<TransactionData[]>([]);
   const [wishlistItems, setWishlistItems] = useState<WishlistItemData[]>([]);
+  const [comments, setComments] = useState<CommentData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"collection" | "history" | "wishlist">("collection");
+  const [activeTab, setActiveTab] = useState<"collection" | "history" | "wishlist" | "comments" >("collection");
 
   const fetchDashboardData = async () => {
     if (!user?.id) return;
@@ -85,7 +99,7 @@ export default function UserDashboard() {
       if (txJson && txJson.success && Array.isArray(txJson.data)) {
         paidRecords = txJson.data;
       } else {
-        // Fallback placeholder logic if backend endpoints haven't registered items yet
+        // Fallback placeholder logic
         const fallbackRes = await fetch(`http://localhost:5000/api/artworks`);
         const fallbackJson = await fallbackRes.json();
         
@@ -103,18 +117,28 @@ export default function UserDashboard() {
           }));
         }
       }
-
-      // Backend already isolates and returns transactions belonging exclusively to the user,
-      // direct matching prevents front-end string comparison mismatches.
       setTransactions(paidRecords);
 
       // 2. Load User Wishlist
+      console.log("Requesting wishlist data for user ID:", user.id);
       const wishlistRes = await fetch(`http://localhost:5000/api/wishlist?userId=${user.id}`);
       const wishlistJson = await wishlistRes.json();
+
       if (wishlistJson && wishlistJson.success && Array.isArray(wishlistJson.data)) {
         setWishlistItems(wishlistJson.data);
       } else {
         setWishlistItems([]);
+      }
+
+      // 3. Load User Comments
+      console.log("Requesting user comments stream for ID:", user.id);
+      const commentsRes = await fetch(`http://localhost:5000/api/comments/user/${user.id}`);
+      const commentsJson = await commentsRes.json();
+
+      if (commentsJson && commentsJson.success && Array.isArray(commentsJson.data)) {
+        setComments(commentsJson.data);
+      } else {
+        setComments([]);
       }
 
     } catch (err: any) {
@@ -255,6 +279,7 @@ export default function UserDashboard() {
             { id: "collection", name: "Purchased Gallery", icon: ShoppingBag },
             { id: "history", name: "Transaction History", icon: CreditCard },
             { id: "wishlist", name: "My Wishlist", icon: Heart },
+            { id: "comments", name: "My Comments", icon: MessageSquare },
           ].map((tab) => {
             const TabIcon = tab.icon;
             const isTabActive = activeTab === tab.id;
@@ -341,7 +366,8 @@ export default function UserDashboard() {
                             <span className="text-xs font-mono font-bold text-[#8A9A5B]">৳{(art.price || 0).toLocaleString()}</span>
                           </div>
 
-                          <Link href={`/browse/${art._id}`}>
+                          {/* 🍃 FIXED ROUTE: point to /product-details/[id] dynamically */}
+                          <Link href={`/product-details/${art._id}`}>
                             <span className="inline-flex items-center gap-1.5 px-3 py-2 bg-[#EFF2E7] hover:bg-[#8A9A5B] hover:text-[#FDFBF7] text-[#3D2B1F] border-[2px] border-[#3D2B1F] rounded-xl text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer">
                               View Details <Eye size={10} />
                             </span>
@@ -478,8 +504,9 @@ export default function UserDashboard() {
                         <div className="flex items-center justify-between pt-2 border-t border-[#3D2B1F]/10">
                           <span className="text-sm font-mono font-bold text-[#3D2B1F]">৳{(art.price || 0).toLocaleString()}</span>
                           
+                          {/* 🍃 FIXED ROUTE: point to /product-details/[id] dynamically */}
                           <button
-                            onClick={() => router.push(`/browse/${art._id}`)}
+                            onClick={() => router.push(`/product-details/${art._id}`)}
                             className="bg-[#3D2B1F] text-[#FDFBF7] border-2 border-[#3D2B1F] rounded-xl px-3 py-1.5 text-[9px] font-black uppercase tracking-widest hover:bg-[#8A9A5B] transition-colors flex items-center gap-1"
                           >
                             View Details <ArrowUpRight size={11} />
@@ -494,6 +521,69 @@ export default function UserDashboard() {
                   <div className="col-span-full bg-[#FDFBF7] border-[3px] border-dashed border-[#3D2B1F]/20 rounded-3xl py-16 text-center">
                     <Heart className="mx-auto text-[#3D2B1F]/20 mb-3" size={32} />
                     <p className="text-xs font-black uppercase tracking-widest text-[#3D2B1F]/40">Your wishlist drawer is empty</p>
+                  </div>
+                )}
+              </motion.div>
+            )}
+
+            {/* VIEW 4: MY COMMENTS */}
+            {activeTab === "comments" && (
+              <motion.div
+                key="comments-tab"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="space-y-4"
+              >
+                {comments.map((comment, idx) => (
+                  <motion.div
+                    key={comment._id}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0, transition: { delay: idx * 0.04 } }}
+                    className="bg-[#FDFBF7] border-[3px] border-[#3D2B1F] rounded-2xl p-5 shadow-[4px_4px_0px_#3D2B1F] flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 transition-all hover:translate-y-[-2px]"
+                  >
+                    <div className="flex items-start gap-4 max-w-2xl">
+                      <div className="bg-[#8A9A5B]/10 p-2.5 rounded-xl border border-[#8A9A5B]/20 text-[#8A9A5B] shrink-0 mt-0.5">
+                        <MessageSquare size={16} />
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-[#3D2B1F] leading-relaxed break-words">
+                          "{comment.comment}"
+                        </p>
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-2 text-[10px] font-bold text-[#3D2B1F]/50 uppercase tracking-wide">
+                          <span>Posted on:</span>
+                          <span className="font-mono text-[#3D2B1F]/70">
+                            {comment.createdAt ? new Date(comment.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : "---"}
+                          </span>
+                          {comment.artworkId && (
+                            <>
+                              <span className="text-[#3D2B1F]/30">•</span>
+                              <span>Artwork:</span>
+                              <span className="text-[#8A9A5B] italic font-medium normal-case">
+                                {comment.artworkId.name}
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {comment.artworkId && (
+                      /* 🍃 FIXED ROUTE: point to /product-details/[id] dynamically */
+                      <button
+                        onClick={() => router.push(`/product-details/${comment.artworkId?._id}`)}
+                        className="inline-flex items-center gap-1.5 px-3 py-2 bg-[#EFF2E7] hover:bg-[#3D2B1F] hover:text-[#FDFBF7] text-[#3D2B1F] border-[2px] border-[#3D2B1F] rounded-xl text-[9px] font-black uppercase tracking-widest transition-all whitespace-nowrap self-end sm:self-auto cursor-pointer"
+                      >
+                        Go to Canvas <ArrowRight size={11} />
+                      </button>
+                    )}
+                  </motion.div>
+                ))}
+
+                {comments.length === 0 && (
+                  <div className="bg-[#FDFBF7] border-[3px] border-dashed border-[#3D2B1F]/20 rounded-3xl py-16 text-center">
+                    <MessageSquare className="mx-auto text-[#3D2B1F]/20 mb-3" size={32} />
+                    <p className="text-xs font-black uppercase tracking-widest text-[#3D2B1F]/40">You haven't left any narrative reviews yet</p>
                   </div>
                 )}
               </motion.div>

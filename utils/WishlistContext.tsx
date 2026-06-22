@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { getUserWishlistIds, toggleWishlist as apiToggleWishlist } from "../utils/api";
+import { useAuth } from "../app/context/AuthContext"; // <-- Import your existing Auth context hook here
 
 interface WishlistContextType {
   wishlist: string[];
@@ -11,18 +12,26 @@ interface WishlistContextType {
 
 const WishlistContext = createContext<WishlistContextType | undefined>(undefined);
 
-// Shared Static fallback user id (matching your current configuration)
-const CURRENT_USER_ID = "65cb3a2f8f1a2c001f8d4e92"; 
-
 export function WishlistProvider({ children }: { children: React.ReactNode }) {
   const [wishlist, setWishlist] = useState<string[]>([]);
   const [isLoadingWishlist, setIsLoadingWishlist] = useState(true);
+  
+  // Connect directly to your live authorization lifecycle wrapper
+  const { user } = useAuth(); 
 
-  // Initialize and load user data once globally
+  // Dynamically load user favorites whenever the logged-in user changes
   useEffect(() => {
     async function initWishlist() {
+      // If no active user profile session context is resolved, reset and halt setup
+      if (!user?.id) {
+        setWishlist([]);
+        setIsLoadingWishlist(false);
+        return;
+      }
+
       try {
-        const savedWishIds = await getUserWishlistIds(CURRENT_USER_ID);
+        setIsLoadingWishlist(true);
+        const savedWishIds = await getUserWishlistIds(user.id);
         setWishlist(savedWishIds);
       } catch (err) {
         console.error("Global context failed to synchronize user favorites:", err);
@@ -30,23 +39,30 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
         setIsLoadingWishlist(false);
       }
     }
+    
     initWishlist();
-  }, []);
+  }, [user?.id]); // Re-run this effect instantly whenever a new session logs in or out
 
   // Shared optimistic toggle pipeline accessible anywhere
   const handleWishlistToggle = async (artworkId: string) => {
+    if (!user?.id) {
+      console.warn("Wishlist Action Blocked: Unauthenticated transaction session state.");
+      return;
+    }
+
     const isCurrentlyAdded = wishlist.includes(artworkId);
     
-    // Snap updates across UI paths instantly
+    // Snap updates across UI paths instantly (Optimistic UI Update)
     setWishlist(prev =>
       isCurrentlyAdded ? prev.filter(id => id !== artworkId) : [...prev, artworkId]
     );
 
     try {
-      await apiToggleWishlist(artworkId, CURRENT_USER_ID);
+      // Pass the real, dynamically resolved user session ID instead of a static string map
+      await apiToggleWishlist(artworkId, user.id);
     } catch (err) {
       console.error("Pipeline failure on global wishlist validation mutation:", err);
-      // Revert if the write transaction drops
+      // Revert instantly if the server transaction gets rejected or fails
       setWishlist(prev =>
         isCurrentlyAdded ? [...prev, artworkId] : prev.filter(id => id !== artworkId)
       );
