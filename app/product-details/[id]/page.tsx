@@ -228,7 +228,7 @@ export default function ArtworkDetails() {
         tag: artFormData.tag,
         description: artFormData.description,
         img: artFormData.img,
-        status: artFormData.status
+        status: artFormData.status as any
       } : null);
 
       setIsArtEditModalOpen(false);
