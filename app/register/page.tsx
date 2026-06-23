@@ -173,12 +173,12 @@ export default function RegisterPage() {
       </div>
 
       <motion.div
-        variants={containerVariants}
+        variants={containerVariants as any}
         initial="hidden"
         animate="visible"
         className={containerClasses}
       >
-        <motion.div variants={itemVariants} className="text-center mb-6 mt-2">
+        <motion.div variants={itemVariants as any} className="text-center mb-6 mt-2">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FDFBF7]/10 border border-[#E2B4BD]/20 text-[10px] uppercase tracking-[0.2em] font-black text-[#E2B4BD] mb-3">
             <Sparkles size={10} className="text-[#8A9A5B]" /> Chitrabeethi Atelier
           </div>
@@ -189,7 +189,7 @@ export default function RegisterPage() {
         </motion.div>
 
         <form onSubmit={handleSubmit} className="space-y-4 max-w-xs md:max-w-sm mx-auto flex flex-col justify-center">
-          <motion.div variants={itemVariants}>
+          <motion.div variants={itemVariants as any}>
             <label className="block text-[10px] font-black text-[#E2B4BD] uppercase tracking-widest mb-1.5 ml-1">
               Full Name
             </label>
@@ -209,7 +209,7 @@ export default function RegisterPage() {
             </div>
           </motion.div>
 
-          <motion.div variants={itemVariants}>
+          <motion.div variants={itemVariants as any}>
             <label className="block text-[10px] font-black text-[#E2B4BD] uppercase tracking-widest mb-1.5 ml-1">
               Email Address
             </label>
@@ -230,7 +230,7 @@ export default function RegisterPage() {
           </motion.div>
 
           {/* 🔄 UPDATED: Name and value updated to profilePicture */}
-          <motion.div variants={itemVariants}>
+          <motion.div variants={itemVariants as any}>
             <label className="block text-[10px] font-black text-[#E2B4BD] uppercase tracking-widest mb-1.5 ml-1">
               Profile Picture URL
             </label>
@@ -249,7 +249,7 @@ export default function RegisterPage() {
             </div>
           </motion.div>
 
-          <motion.div variants={itemVariants}>
+          <motion.div variants={itemVariants as any}>
             <label className="block text-[10px] font-black text-[#E2B4BD] uppercase tracking-widest mb-1.5 ml-1">
               Account Purpose
             </label>
@@ -280,7 +280,7 @@ export default function RegisterPage() {
           </motion.div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-            <motion.div variants={itemVariants}>
+            <motion.div variants={itemVariants as any}>
               <label className="block text-[10px] font-black text-[#E2B4BD] uppercase tracking-widest mb-1.5 ml-1">
                 Password
               </label>
@@ -307,7 +307,7 @@ export default function RegisterPage() {
               </div>
             </motion.div>
 
-            <motion.div variants={itemVariants}>
+            <motion.div variants={itemVariants as any}>
               <label className="block text-[10px] font-black text-[#E2B4BD] uppercase tracking-widest mb-1.5 ml-1">
                 Verify Pass
               </label>
@@ -336,7 +336,7 @@ export default function RegisterPage() {
           </div>
 
           <motion.button
-            variants={itemVariants}
+            variants={itemVariants as any}
             whileHover={{ scale: 1.01 }}
             whileTap={{ scale: 0.99 }}
             type="submit"
@@ -351,7 +351,7 @@ export default function RegisterPage() {
           </motion.button>
         </form>
 
-        <motion.p variants={itemVariants} className="text-center text-[11px] text-[#E2B4BD]/70 font-bold mt-6 mb-2">
+        <motion.p variants={itemVariants as any} className="text-center text-[11px] text-[#E2B4BD]/70 font-bold mt-6 mb-2">
           Already belong to the archive?
           <Link href="/login" className="text-[#FDFBF7] font-black hover:text-[#E2B4BD] transition-colors ml-1 underline underline-offset-4 decoration-2">
             Login here

@@ -182,7 +182,7 @@ export default function ProfilePage() {
           console.error("Failed to sync fresh user dataset from database:", err);
         }
 
-        const savedDbImage = user.profilePicture || user.photoUrl || user.avatar || user.img || "";
+        const savedDbImage = (user as any)?.profilePicture || (user as any)?.photoUrl || (user as any)?.avatar || (user as any)?.img || "";
         setFormData({
           name: user.name || "",
           photoUrl: savedDbImage.includes("ui-avatars.com") ? "" : savedDbImage,
@@ -331,24 +331,24 @@ export default function ProfilePage() {
 
     if (isOwner) {
       if (formData.photoUrl && formData.photoUrl.trim() !== "") return formData.photoUrl;
-      if (isValidUrl(user?.profilePicture)) return user.profilePicture;
-      if (isValidUrl(user?.photoUrl)) return user.photoUrl;
-      if (isValidUrl(user?.avatar)) return user.avatar;
-      if (isValidUrl(user?.img)) return user.img;
+      if (isValidUrl(user?.profilePicture)) return user?.profilePicture;
+      if (isValidUrl(user?.photoUrl)) return user?.photoUrl;
+      if (isValidUrl((user as any)?.avatar)) return (user as any).avatar;
+      if (isValidUrl((user as any)?.img)) return (user as any).img;
       return `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(user?.name || "Studio")}`;
     } else {
-      if (isValidUrl(publicArtistInfo?.profilePicture)) return publicArtistInfo.profilePicture;
-      if (isValidUrl(publicArtistInfo?.photoUrl)) return publicArtistInfo.photoUrl;
-      if (isValidUrl(publicArtistInfo?.avatar)) return publicArtistInfo.avatar;
-      if (isValidUrl(publicArtistInfo?.img)) return publicArtistInfo.img;
-      return `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(publicArtistInfo?.name || "Artist")}`;
+      if (isValidUrl((publicArtistInfo as any)?.profilePicture)) return (publicArtistInfo as any).profilePicture;
+      if (isValidUrl((publicArtistInfo as any)?.photoUrl)) return (publicArtistInfo as any).photoUrl;
+      if (isValidUrl((publicArtistInfo as any)?.avatar)) return (publicArtistInfo as any).avatar;
+      if (isValidUrl((publicArtistInfo as any)?.img)) return (publicArtistInfo as any).img;
+      return `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent((publicArtistInfo as any)?.name || "Artist")}`;
     }
   };
 
   const displayProfilePicture = getAvatarUrl();
   const displayProfileRole = isOwner ? (user?.role || "Artist") : (publicArtistInfo?.role || "Artist");
 
-  const currentDbImageValue = user?.profilePicture || user?.photoUrl || user?.avatar || user?.img || "";
+const currentDbImageValue = (user as any)?.profilePicture || (user as any)?.photoUrl || (user as any)?.avatar || (user as any)?.img || "";
   
   // Adjusted to track modifications when text inside password configurations changes as well
   const isFormChanged =
@@ -411,8 +411,8 @@ export default function ProfilePage() {
       const response = await api.delete(`/api/artworks/${artworkId}`, {
         data: {
           authUser: {
-            id: user.id || user._id,
-            role: user.role || "artist" 
+            id: (user as any)?.id || (user as any)?._id,
+role: (user as any)?.role || "artist"
           }
         }
       });
@@ -462,12 +462,12 @@ export default function ProfilePage() {
         
         {/* LEFT COLUMN: ARTIST METADATA PROFILE BLOCK */}
         <motion.div 
-          variants={containerVariants}
+          variants={containerVariants as any}
           initial="hidden"
           animate="visible"
           className="lg:col-span-4 space-y-6 lg:sticky lg:top-24"
         >
-          <motion.div variants={itemVariants} className="bg-white/60 backdrop-blur-md border border-[#EADFC9] rounded-[2rem] p-6 shadow-sm relative overflow-hidden">
+          <motion.div variants={itemVariants as any} className="bg-white/60 backdrop-blur-md border border-[#EADFC9] rounded-[2rem] p-6 shadow-sm relative overflow-hidden">
             <div className="flex flex-col items-center text-center space-y-4">
               
               <div className="relative">
