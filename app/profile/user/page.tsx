@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../../context/AuthContext";
 import { useRouter, useParams } from "next/navigation";
 import {
   LogOut,
@@ -15,7 +15,7 @@ import {
   CheckCircle2,
   AlertCircle
 } from "lucide-react";
-import api from "../../lib/axios";
+import api from "../../../lib/axios";
 
 // --- Framer Motion Animations ---
 const containerVariants = {
