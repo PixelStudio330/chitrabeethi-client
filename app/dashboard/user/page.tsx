@@ -98,14 +98,14 @@ function DashboardContent() {
       setErrorMsg(null);
 
       // 1. Load User Transactions
-      const txRes = await fetch(`http://localhost:5000/api/payments/my-transactions?userId=${user.id}`);
+      const txRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/payments/my-transactions?userId=${user.id}`);
       const txJson = await txRes.json();
       
       let paidRecords: TransactionData[] = [];
       if (txJson && txJson.success && Array.isArray(txJson.data)) {
         paidRecords = txJson.data;
       } else {
-        const fallbackRes = await fetch(`http://localhost:5000/api/artworks`);
+        const fallbackRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/artworks`);
         const fallbackJson = await fallbackRes.json();
         
         if (fallbackJson && fallbackJson.success && Array.isArray(fallbackJson.artworks)) {
@@ -126,7 +126,7 @@ function DashboardContent() {
 
       // 2. Optional: Fetch fresh user data directly from DB to verify sync tier bypasses stale cache
       try {
-        const userProfileRes = await fetch(`http://localhost:5000/api/users/${user.id}`);
+        const userProfileRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/users/${user.id}`);
         const userProfileJson = await userProfileRes.json();
         if (userProfileJson && userProfileJson.success && userProfileJson.user?.subscriptionTier) {
           setLocalTier(userProfileJson.user.subscriptionTier);
@@ -136,7 +136,7 @@ function DashboardContent() {
       }
 
       // 3. Load User Wishlist
-      const wishlistRes = await fetch(`http://localhost:5000/api/wishlist?userId=${user.id}`);
+      const wishlistRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/wishlist?userId=${user.id}`);
       const wishlistJson = await wishlistRes.json();
       if (wishlistJson && wishlistJson.success && Array.isArray(wishlistJson.data)) {
         setWishlistItems(wishlistJson.data);
@@ -145,7 +145,7 @@ function DashboardContent() {
       }
 
       // 4. Load User Comments
-      const commentsRes = await fetch(`http://localhost:5000/api/comments/user/${user.id}`);
+      const commentsRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/comments/user/${user.id}`);
       const commentsJson = await commentsRes.json();
       if (commentsJson && commentsJson.success && Array.isArray(commentsJson.data)) {
         setComments(commentsJson.data);
@@ -171,7 +171,7 @@ function DashboardContent() {
 
       try {
         setIsLoading(true);
-        const verifyRes = await fetch("http://localhost:5000/api/payments/verify-payment", {
+        const verifyRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/payments/verify-payment`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ sessionId }),
@@ -215,7 +215,7 @@ function DashboardContent() {
     try {
       setIsUpgrading(targetTier);
       
-      const res = await fetch("http://localhost:5000/api/payments/create-subscription-checkout", {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/payments/create-subscription-checkout`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId: user.id, tier: targetTier }),

@@ -24,7 +24,7 @@ import {
 import { useAuth } from "../../context/AuthContext";
 import { getArtworks, ArtworkData } from "../../../utils/api";
 
-const BASE_URL = "http://localhost:5000/api/artworks";
+const BASE_URL = `${process.env.NEXT_PUBLIC_API_URL}/api/artworks`;
 
 const CATEGORIES = ["Painting", "Acrylic Art", "Sculpture", "Photography", "Canvas", "Paper"];
 

@@ -75,23 +75,23 @@ export default function AdminDashboard() {
       setIsLoading(true);
       
       // 1. Fetch Users Management Matrix
-      const usersRes = await fetch("http://localhost:5000/api/auth/users");
+      const usersRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/users`);
       const usersJson = await usersRes.json();
       if (usersJson.success) setUsers(usersJson.data);
 
       // 2. Fetch Global Artworks Catalog
-      const artworksRes = await fetch("http://localhost:5000/api/artworks");
+      const artworksRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/artworks`);
       const artworksJson = await artworksRes.json();
       const loadedArtworks = Array.isArray(artworksJson) ? artworksJson : artworksJson.data || [];
       setArtworks(loadedArtworks);
 
       // 3. Fetch Ledger Transactions Records
-      const txRes = await fetch("http://localhost:5000/api/payments/all-transactions");
+      const txRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/payments/all-transactions`);
       const txJson = await txRes.json();
       if (txJson.success) setTransactions(txJson.data);
 
       // 4. Fetch Dynamic Pre-calculated Analytics Summary Stream
-      const analyticsRes = await fetch("http://localhost:5000/api/payments/admin-analytics");
+      const analyticsRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/payments/admin-analytics`);
       const analyticsJson = await analyticsRes.json();
       if (analyticsJson.success) {
         setMetrics(analyticsJson.metrics);
@@ -112,7 +112,7 @@ export default function AdminDashboard() {
   // --- MUTATION ACTIONS HANDLERS ---
   const handleRoleChange = async (userId: string, newRole: string) => {
     try {
-      const res = await fetch("http://localhost:5000/api/auth/update-role", {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/update-role`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ targetUserId: userId, newRole })
@@ -139,7 +139,7 @@ export default function AdminDashboard() {
 );
 
 const res = await fetch(
-  `http://localhost:5000/api/artworks/${artId}`,
+  `${process.env.NEXT_PUBLIC_API_URL}/api/artworks/${artId}`,
   {
     method: "DELETE",
     headers: {

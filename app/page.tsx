@@ -56,7 +56,7 @@ export default function Home() {
         setIsLoading(true);
         // Note: Removing the strict ?limit=6 helps get a larger pool to randomize from, 
         // but if your DB is huge, keep the limit or increase it to 12/24 to shuffle nicely!
-        const response = await fetch("http://localhost:5000/api/artworks");
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/artworks`);
         const json = await response.json();
         
         if (json.success) {
@@ -84,9 +84,9 @@ export default function Home() {
     const fetchTopArtists = async () => {
       try {
         setIsArtistsLoading(true);
-        let response = await fetch("http://localhost:5000/api/auth/artists?limit=5");
+        let response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/artists?limit=5`);
         if (response.status === 404) {
-          response = await fetch("http://localhost:5000/api/auth/users?role=artist&limit=5");
+          response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/users?role=artist&limit=5`);
         }
         const json = await response.json();
         if (json.success && (json.data?.length || json.users?.length || json.artists?.length)) {
