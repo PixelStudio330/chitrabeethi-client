@@ -38,15 +38,15 @@ export default function ArtworkDetails() {
   const [artwork, setArtwork] = useState<ArtworkData | null>(null);
   const [comments, setComments] = useState<CommentData[]>([]);
   const [hasPurchased, setHasPurchased] = useState<boolean>(false); 
-  const [purchaseCount, setPurchaseCount] = useState<number>(0); // Track total user acquisitions for constraints
+  const [purchaseCount, setPurchaseCount] = useState<number>(0); 
   const [newComment, setNewComment] = useState("");
   const [loading, setLoading] = useState(true);
   const [isZoomed, setIsZoomed] = useState(false);
   const [paymentLoading, setPaymentLoading] = useState(false);
 
   // Modal Control States
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false); // For Comments
-  const [isArtEditModalOpen, setIsArtEditModalOpen] = useState(false); // For Artwork Listing
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false); 
+  const [isArtEditModalOpen, setIsArtEditModalOpen] = useState(false); 
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
   const [isSavingEdit, setIsSavingEdit] = useState(false);
@@ -73,7 +73,6 @@ export default function ArtworkDetails() {
   useEffect(() => {
     if (!id) return;
 
-    // Capture the Stripe checkout session parameter from the URL if returning from a purchase
     const urlParams = new URLSearchParams(window.location.search);
     const stripeSessionId = urlParams.get("session_id");
 
@@ -81,7 +80,6 @@ export default function ArtworkDetails() {
       try {
         setLoading(true);
 
-        // If arriving with a session_id, verify the payment with the backend immediately
         if (stripeSessionId) {
           try {
             const verifyResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/payments/verify-payment`, {
@@ -92,7 +90,6 @@ export default function ArtworkDetails() {
             
             if (verifyResponse.ok) {
               showToast("Transaction captured and vaulted successfully!", "success");
-              // Clear URL query parameters cleanly so refreshing doesn't send duplicate requests
               window.history.replaceState({}, document.title, window.location.pathname);
             }
           } catch (vErr) {
@@ -103,7 +100,6 @@ export default function ArtworkDetails() {
         const artData = await getArtworkById(id as string);
         setArtwork(artData);
 
-        // Map initial structural form values from backend schema properties
         if (artData) {
           setArtFormData({
             name: artData.name || "",
@@ -116,12 +112,10 @@ export default function ArtworkDetails() {
           });
         }
 
-        // Gather Comments & Purchase History Details
         const responseData = await getCommentsByArtwork(id as string, user?.id);
         setComments(responseData.comments || []);
         setHasPurchased(responseData.hasPurchased || false);
 
-        // Fetch user transaction history pipeline to enforce limits accurately on frontend
         if (user?.id) {
           const txRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/payments/my-transactions?userId=${user.id}`);
           const txJson = await txRes.json();
@@ -159,6 +153,12 @@ export default function ArtworkDetails() {
 
     try {
       setPaymentLoading(true);
+
+      // Dynamically target the exact context path: product-details/[id]
+      const currentOrigin = window.location.origin;
+      const successUrl = `${currentOrigin}/product-details/${id}?session_id={CHECKOUT_SESSION_ID}`;
+      const cancelUrl = `${currentOrigin}/product-details/${id}`;
+
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/payments/create-artwork-checkout`, {
         method: "POST",
         headers: {
@@ -167,6 +167,8 @@ export default function ArtworkDetails() {
         body: JSON.stringify({
           artworkId: artwork?._id,
           userId: user.id,
+          successUrl, // ✨ Handed off to backend configuration rules
+          cancelUrl   // ✨ Handed off to backend configuration rules
         }),
       });
 
@@ -372,14 +374,8 @@ export default function ArtworkDetails() {
     }
   };
 
-  // Check ownership matches based on backend controller configurations
   const isArtistOwner = artwork && user && (user.id === artwork.artist?._id || user.id === artwork.artist as any);
-  
-  // 💡 DYNAMIC SUBSCRIPTION RESTRICTIONS PIPELINE FIXED
-  // Normalizes tier string handling from user auth context object data models cleanly
   const activeTier = ((user as any)?.subscriptionTier || "free").toLowerCase();
-  
-  // Evaluates strict tier maximum bounds correctly so Pro accounts can pass intermediate ranges
   const isTierRestricted = 
     (activeTier === "free" && purchaseCount >= 3) || 
     (activeTier === "pro" && purchaseCount >= 9);
@@ -427,7 +423,6 @@ export default function ArtworkDetails() {
 
   return (
     <main className="min-h-screen bg-[#FDFBF7] text-[#3D2B1F] pt-36 pb-20 px-6 overflow-hidden">
-      {/* Toast Notification Element */}
       <AnimatePresence>
         {toastMessage && (
           <motion.div
@@ -447,7 +442,6 @@ export default function ArtworkDetails() {
         )}
       </AnimatePresence>
 
-      {/* DYNAMIC COMMENT EDITING MODAL */}
       <AnimatePresence>
         {isEditModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -524,7 +518,6 @@ export default function ArtworkDetails() {
         )}
       </AnimatePresence>
 
-      {/* DYNAMIC CORE ARTWORK DATA EDITING MODAL */}
       <AnimatePresence>
         {isArtEditModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -862,7 +855,6 @@ export default function ArtworkDetails() {
 
             <hr className="border-[#3D2B1F]/10 my-4" />
             
-            {/* DISCUSSION FORUM ELEMENTS */}
             <div className="space-y-4">
               <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[#3D2B1F] flex items-center gap-2">
                 <MessageSquare size={14} /> Gallery Dialogue ({comments.length})
