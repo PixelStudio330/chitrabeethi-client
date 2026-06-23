@@ -161,7 +161,7 @@ function DashboardContent() {
     }
   };
 
-useEffect(() => {
+  useEffect(() => {
     const handleIncomingPaymentVerification = async () => {
       const sessionId = searchParams.get("session_id");
       if (!sessionId) {
@@ -180,22 +180,17 @@ useEffect(() => {
         const verifyJson = await verifyRes.json();
 
         if (verifyRes.ok) {
-          // 🌟 FIX: Commit the verified backend user state to AuthContext so it saves to localStorage
           if (verifyJson && verifyJson.user) {
             setUser(verifyJson.user);
           } else if (verifyJson && verifyJson.subscriptionTier) {
             setUser((prev: any) => prev ? { ...prev, subscriptionTier: verifyJson.subscriptionTier } : null);
           } else {
-            // Fallback sync using the query parameter helper if the backend doesn't return the full user payload
             const target = searchParams.get("tier") || "pro"; 
             setUser((prev: any) => prev ? { ...prev, subscriptionTier: target } : null);
             setLocalTier(target);
           }
           
-          // Clear query params elegantly without triggering context flashes
           window.history.replaceState({}, document.title, window.location.pathname);
-          
-          // Trigger a clean state fetch update
           if (user) await fetchDashboardData();
         } else {
           console.error("Payment verification fallback warning:", verifyJson.message);
@@ -220,7 +215,6 @@ useEffect(() => {
     try {
       setIsUpgrading(targetTier);
       
-      // Pass target tier down query parameters to catch on return trip in case context drops
       const res = await fetch("http://localhost:5000/api/payments/create-subscription-checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -231,7 +225,6 @@ useEffect(() => {
       let checkoutUrl = json.url || (json.data && json.data.url);
 
       if (checkoutUrl) {
-        // Inject tier parameter helper to bypass stale context fallback cycles on route redirect hook
         if (checkoutUrl.includes("success_url")) {
           checkoutUrl = checkoutUrl.replace("dashboard/user", `dashboard/user?tier=${targetTier}`);
         }
@@ -257,14 +250,13 @@ useEffect(() => {
     0
   );
 
-  // Fall back to local state tracker if it exists, otherwise use auth profile tier context
   const activeTier = localTier || (user as any)?.subscriptionTier || "free";
   
   const tierConfig = {
     free: { name: "Free Tier", max: 3, progressColor: "bg-[#3D2B1F]/30" },
     pro: { name: "Pro Collector", max: 9, progressColor: "bg-[#8A9A5B]" },
     premium: { name: "Premium Guild", max: Infinity, progressColor: "bg-[#E2B4BD]" }
-  }[activeTier as "free" | "pro" | "premium"] || { name: "Free Tier", max: 3, progressColor: "bg-[#3D2B1F]/30", };
+  }[activeTier as "free" | "pro" | "premium"] || { name: "Free Tier", max: 3, progressColor: "bg-[#3D2B1F]/30" };
 
   const progressPercent = tierConfig.max === Infinity 
     ? 100 
@@ -332,45 +324,6 @@ useEffect(() => {
                 </div>
               </div>
             </div>
-
-            {/* Subscriptions CTA Interface Elements */}
-            <div className="pt-4 border-t border-[#3D2B1F]/10 space-y-2">
-              {activeTier === "free" && (
-                <>
-                  <button
-                    disabled={isUpgrading !== null}
-                    onClick={() => handleUpgradeTier("pro")}
-                    className="w-full bg-[#8A9A5B] text-[#FDFBF7] font-black text-[10px] uppercase tracking-widest py-2.5 rounded-xl border-2 border-[#3D2B1F] flex items-center justify-center gap-1.5 shadow-[2px_2px_0px_#3D2B1F] hover:shadow-none transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isUpgrading === "pro" ? <Loader2 className="animate-spin" size={12} /> : <Zap size={11} />}
-                    Upgrade to Pro ($9.99)
-                  </button>
-                  <button
-                    disabled={isUpgrading !== null}
-                    onClick={() => handleUpgradeTier("premium")}
-                    className="w-full bg-[#E2B4BD] text-[#3D2B1F] font-black text-[10px] uppercase tracking-widest py-2.5 rounded-xl border-2 border-[#3D2B1F] flex items-center justify-center gap-1.5 shadow-[2px_2px_0px_#3D2B1F] hover:shadow-none transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isUpgrading === "premium" ? <Loader2 className="animate-spin" size={12} /> : <Sparkles size={11} />}
-                    Go Premium Unlimited ($19.99)
-                  </button>
-                </>
-              )}
-              {activeTier === "pro" && (
-                <button
-                  disabled={isUpgrading !== null}
-                  onClick={() => handleUpgradeTier("premium")}
-                  className="w-full bg-[#E2B4BD] text-[#3D2B1F] font-black text-[10px] uppercase tracking-widest py-2.5 rounded-xl border-2 border-[#3D2B1F] flex items-center justify-center gap-1.5 shadow-[2px_2px_0px_#3D2B1F] hover:shadow-none transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isUpgrading === "premium" ? <Loader2 className="animate-spin" size={12} /> : <Sparkles size={11} />}
-                  Upgrade to Premium Guild ($19.99)
-                </button>
-              )}
-              {activeTier === "premium" && (
-                <div className="text-center py-1 bg-[#3D2B1F]/5 rounded-xl text-[9px] font-bold text-[#8A9A5B] uppercase tracking-wider">
-                  👑 Absolute Sovereign Access Tier Enabled
-                </div>
-              )}
-            </div>
           </div>
 
           {/* Quick Metrics Multiplier Tracker */}
@@ -396,6 +349,149 @@ useEffect(() => {
             </div>
             <p className="text-[10px] font-medium text-[#3D2B1F]/70 mt-4 leading-relaxed">
               Review saved masterworks or backstories seamlessly before they are claimed.
+            </p>
+          </div>
+        </div>
+
+        {/* 🌟 STYLISH THREE-COLUMN SUBSCRIPTION CARDS GRID */}
+        <div className="mt-8 mb-12 space-y-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
+            
+            {/* 1. FREE TIER CARD (Left) */}
+            <div className={`bg-[#FDFBF7] border-2 border-[#3D2B1F] rounded-3xl p-6 flex flex-col justify-between shadow-[4px_4px_0px_#3D2B1F] relative overflow-hidden transition-all ${activeTier === 'free' ? 'ring-2 ring-offset-2 ring-[#3D2B1F]/30' : ''}`}>
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-[#3D2B1F]/50">Base Level</span>
+                  {activeTier === "free" && (
+                    <span className="bg-[#3D2B1F]/10 text-[#3D2B1F] text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full">Current</span>
+                  )}
+                </div>
+                <h4 className="text-lg font-black text-[#3D2B1F] tracking-tight">Free Tier</h4>
+                <p className="text-[11px] text-[#3D2B1F]/70 mt-1 mb-4 leading-relaxed">Perfect for getting started and exploring the cozy marketplace galleries.</p>
+                <div className="text-2xl font-black text-[#3D2B1F] mb-6">$0.00 <span className="text-xs font-medium text-[#3D2B1F]/50">/ forever</span></div>
+                
+                <ul className="space-y-2 mb-6">
+                  <li className="text-[11px] font-medium text-[#3D2B1F] flex items-center gap-2">✨ Max 3 painting purchases</li>
+                  <li className="text-[11px] font-medium text-[#3D2B1F] flex items-center gap-2">🎨 Standard browser role</li>
+                </ul>
+              </div>
+              <button disabled className="w-full bg-[#3D2B1F]/5 text-[#3D2B1F]/40 font-black text-[10px] uppercase tracking-widest py-3 rounded-2xl border-2 border-dashed border-[#3D2B1F]/20 cursor-not-allowed">
+                Default Tier
+              </button>
+            </div>
+
+            {/* 2. PREMIUM GUILD CARD (Center / Featured) */}
+            <div className={`bg-[#EADFC9]/20 border-3 border-[#3D2B1F] rounded-3xl p-6 flex flex-col justify-between shadow-[6px_6px_0px_#3D2B1F] relative overflow-hidden transition-all md:-translate-y-2 ${activeTier === 'premium' ? 'ring-4 ring-[#EADFC9]' : ''}`}>
+              <div className="absolute top-0 right-0 bg-[#3D2B1F] text-[#FDFBF7] text-[8px] font-black uppercase tracking-widest px-4 py-1.5 rounded-bl-xl border-l border-b border-[#3D2B1F]">
+                Most Popular
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-[#8A9A5B] flex items-center gap-1">👑 Sovereign Access</span>
+                  {activeTier === "premium" && (
+                    <span className="bg-[#8A9A5B] text-[#FDFBF7] text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full">Active Plan</span>
+                  )}
+                </div>
+                <h4 className="text-xl font-black text-[#3D2B1F] tracking-tight flex items-center gap-1.5">
+                  Premium Guild <Sparkles size={16} className="text-[#3D2B1F]" />
+                </h4>
+                <p className="text-[11px] text-[#3D2B1F]/70 mt-1 mb-4 leading-relaxed">Ultimate unrestricted pass for absolute art masters and high-end collectors.</p>
+                <div className="text-2xl font-black text-[#3D2B1F] mb-6">$19.99 <span className="text-xs font-medium text-[#3D2B1F]/50">/ single upgrade</span></div>
+                
+                <ul className="space-y-2 mb-6">
+                  <li className="text-[11px] font-bold text-[#3D2B1F] flex items-center gap-2">🚀 Unlimited painting purchases</li>
+                  <li className="text-[11px] font-medium text-[#3D2B1F]/80 flex items-center gap-2">⭐ Premium Sovereign badge profile accent</li>
+                  <li className="text-[11px] font-medium text-[#3D2B1F]/80 flex items-center gap-2">⚡ Priority verification pipeline triggers</li>
+                </ul>
+              </div>
+
+              {activeTier === "premium" ? (
+                <div className="text-center py-2.5 bg-[#8A9A5B]/10 rounded-2xl text-[9px] font-black text-[#8A9A5B] uppercase tracking-wider border border-[#8A9A5B]/30">
+                  ✓ Active Sovereign Tier
+                </div>
+              ) : (
+                <button
+                  disabled={isUpgrading !== null}
+                  onClick={() => handleUpgradeTier("premium")}
+                  className="w-full bg-[#E2B4BD] text-[#3D2B1F] font-black text-[10px] uppercase tracking-widest py-3 rounded-2xl border-2 border-[#3D2B1F] flex items-center justify-center gap-2 shadow-[3px_3px_0px_#3D2B1F] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all disabled:opacity-50"
+                >
+                  {isUpgrading === "premium" ? <Loader2 className="animate-spin" size={12} /> : <Sparkles size={11} />}
+                  Go Premium Unlimited ($19.99)
+                </button>
+              )}
+            </div>
+
+            {/* 3. PRO COLLECTOR CARD (Right) */}
+            <div className={`bg-[#FDFBF7] border-2 border-[#3D2B1F] rounded-3xl p-6 flex flex-col justify-between shadow-[4px_4px_0px_#3D2B1F] relative overflow-hidden transition-all ${activeTier === 'pro' ? 'ring-2 ring-offset-2 ring-[#8A9A5B]/50' : ''}`}>
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-[#3D2B1F]/50">Advanced Tier</span>
+                  {activeTier === "pro" && (
+                    <span className="bg-[#8A9A5B] text-[#FDFBF7] text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full">Current</span>
+                  )}
+                </div>
+                <h4 className="text-lg font-black text-[#3D2B1F] tracking-tight">Pro Collector</h4>
+                <p className="text-[11px] text-[#3D2B1F]/70 mt-1 mb-4 leading-relaxed">Expanded capacity limits designed tailored for passionate artwork patrons.</p>
+                <div className="text-2xl font-black text-[#3D2B1F] mb-6">$9.99 <span className="text-xs font-medium text-[#3D2B1F]/50">/ single upgrade</span></div>
+                
+                <ul className="space-y-2 mb-6">
+                  <li className="text-[11px] font-medium text-[#3D2B1F] flex items-center gap-2">✨ Up to 9 painting purchases</li>
+                  <li className="text-[11px] font-medium text-[#3D2B1F] flex items-center gap-2">🌿 Enhanced Pro Collector UI badge</li>
+                </ul>
+              </div>
+
+              {activeTier === "premium" ? (
+                <div className="text-center py-2.5 bg-[#3D2B1F]/5 rounded-2xl text-[9px] font-bold text-[#3D2B1F]/40 uppercase tracking-wider">
+                  Max Tier Unlocked
+                </div>
+              ) : activeTier === "pro" ? (
+                <div className="text-center py-2.5 bg-[#8A9A5B]/10 rounded-2xl text-[9px] font-black text-[#8A9A5B] uppercase tracking-wider border border-[#8A9A5B]/30">
+                  ✓ Active Pro Tier
+                </div>
+              ) : (
+                <button
+                  disabled={isUpgrading !== null}
+                  onClick={() => handleUpgradeTier("pro")}
+                  className="w-full bg-[#8A9A5B] text-[#FDFBF7] font-black text-[10px] uppercase tracking-widest py-3 rounded-2xl border-2 border-[#3D2B1F] flex items-center justify-center gap-2 shadow-[3px_3px_0px_#3D2B1F] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all disabled:opacity-50"
+                >
+                  {isUpgrading === "pro" ? <Loader2 className="animate-spin" size={12} /> : <Zap size={11} />}
+                  Upgrade to Pro ($9.99)
+                </button>
+              )}
+            </div>
+
+          </div>
+
+          {/* 📊 UNIFIED CURRENT STATUS AND LIMIT PROGRESS METRIC BAR */}
+          <div className="bg-[#FDFBF7] border-2 border-[#3D2B1F] rounded-2xl p-5 shadow-[4px_4px_0px_#3D2B1F] space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <div>
+                <div className="text-[9px] font-black uppercase tracking-widest text-[#3D2B1F]/50">Account Authorization Status</div>
+                <div className="text-sm font-black text-[#3D2B1F] uppercase tracking-wide flex items-center gap-1.5 mt-0.5">
+                  Active Plan: <span className="underline decoration-wavy decoration-[#8A9A5B]">{tierConfig.name}</span>
+                </div>
+              </div>
+              <div className="text-right sm:text-right">
+                <span className="text-xs font-mono font-bold text-[#3D2B1F] bg-[#3D2B1F]/5 px-2.5 py-1 rounded-lg border border-[#3D2B1F]/10">
+                  Vault Allocation: {purchaseCount} / {tierConfig.max === Infinity ? "∞" : tierConfig.max} Used
+                </span>
+              </div>
+            </div>
+
+            {/* Elegant Loader style Bar Component */}
+            <div className="w-full h-4 bg-[#3D2B1F]/10 border border-[#3D2B1F] rounded-full p-0.5 overflow-hidden">
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: `${progressPercent}%` }}
+                transition={{ duration: 0.8, ease: "easeOut" }}
+                className={`h-full rounded-full border-r border-[#3D2B1F] ${tierConfig.progressColor}`}
+              />
+            </div>
+            
+            <p className="text-[10px] font-medium text-[#3D2B1F]/60 italic">
+              {activeTier === "premium" 
+                ? "✨ Sovereign access granted. Infinite gallery catalog imports enabled." 
+                : `You have initialized ${purchaseCount} checkout validations out of your current ${tierConfig.max} purchase allocation.`}
             </p>
           </div>
         </div>

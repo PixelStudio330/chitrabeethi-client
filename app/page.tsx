@@ -1,42 +1,61 @@
 "use client";
 
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { Eye, Plus, Loader2, Inbox } from "lucide-react";
 
-// Updated to 4 fine art painting items as requested
-const ARTWORKS = [
-  { id: 1, name: "Symphony of the Sacred Lotus", price: 45000, img: "/tuna.jpg", tag: "Original Acrylic", category: "Canvas" },
-  { id: 2, name: "Whispering River Mornings", price: 32000, img: "/menu4.jpg", tag: "Pure Watercolor", category: "Paper" },
-  { id: 3, name: "Echoes of the Mystic Baul", price: 65000, img: "/special sushi.png", tag: "Heritage Collection", category: "Paper" },
-  { id: 4, name: "Serenity in the Golden Crimson Haze", price: 28000, img: "/menu5.jpg", tag: "Fine Art Print", category: "Canvas" },
+interface ArtworkData {
+  _id: string;
+  name: string;
+  description: string;
+  price: number;
+  category: string;
+  img: string;
+  tag: string;
+  status: "available" | "sold" | "unpublished";
+}
+
+const CARD_BG_COLORS = [
+  "bg-[#F4EFE6]", 
+  "bg-[#F5E6E8]", 
+  "bg-[#EFF2E7]", 
+  "bg-[#F9F6F0]", 
 ];
 
 export default function Home() {
-  const [filter, setFilter] = useState("Canvas");
-  const [quantities, setQuantities] = useState<{ [key: number]: number }>({});
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [tempValue, setTempValue] = useState<string>("");
+  const router = useRouter();
+  const [artworks, setArtworks] = useState<ArtworkData[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [selectedCategory, setSelectedCategory] = useState<string>("All");
 
-  const filteredArtworks = ARTWORKS.filter(artwork => artwork.category === filter);
+  // Fetch exactly 6 artworks from the backend API
+  useEffect(() => {
+    const fetchHomeArtworks = async () => {
+      try {
+        setIsLoading(true);
+        // Request limit=6 to load precisely six high-end showcase pieces
+        const response = await fetch("http://localhost:5000/api/artworks?limit=6");
+        const json = await response.json();
+        if (json.success) {
+          setArtworks(json.artworks || json.data || []);
+        }
+      } catch (error) {
+        console.error("Error connecting to Chitrabeethi Vault Base:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
-  const handleInputChange = (val: string) => {
-    const numericValue = val.replace(/\D/g, "");
-    setTempValue(numericValue);
-  };
+    fetchHomeArtworks();
+  }, []);
 
-  const handleBlur = (id: number) => {
-    const finalVal = tempValue === "" ? 0 : parseInt(tempValue, 10);
-    setQuantities(prev => ({ ...prev, [id]: finalVal }));
-    setEditingId(null);
-    setTempValue("");
-  };
-
-  const updateQty = (id: number, delta: number) => {
-    setQuantities(prev => ({
-      ...prev,
-      [id]: Math.max(0, (prev[id] || 0) + delta)
-    }));
-  };
+  // Compute filtered listings dynamically based on active selection bar
+  const filteredArtworks = React.useMemo(() => {
+    if (selectedCategory === "All") return artworks;
+    return artworks.filter(art => art.category.toLowerCase() === selectedCategory.toLowerCase());
+  }, [artworks, selectedCategory]);
 
   return (
     <>
@@ -45,7 +64,7 @@ export default function Home() {
         {/* --- HERO SECTION --- */}
         <section className="relative w-full min-h-screen flex flex-col items-center justify-center px-4 md:px-10 overflow-hidden">
           
-          {/* Decorative Orbs - Left */}
+          {/* Decorative Background Orbs */}
           <div className="absolute top-10 -left-10 md:-left-24 w-40 md:w-64 h-64 select-none pointer-events-none z-0">
             <div className="relative w-full h-full">
               <div className="absolute top-0 left-0 w-32 h-32 md:w-80 md:h-80 bg-[#e2b4bd] opacity-20 rounded-full" />
@@ -54,7 +73,6 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Hero Decorative Background - Right */}
           <div className="absolute top-[15%] -right-16 md:top-[20%] md:right-0 w-64 md:w-120 h-auto md:h-150 select-none pointer-events-none z-0">
             <div className="relative h-full w-full flex items-center justify-end">
               <div className="absolute w-80 h-64 md:w-120 md:h-96 lg:w-160 lg:h-160 bg-[#5C4033] opacity-10 rounded-full translate-x-1/2" />
@@ -85,12 +103,12 @@ export default function Home() {
               </h1>
               
               <div className="flex flex-col items-center mt-[-5px] md:mt-[-20px]">
-                  <p className="text-lg md:text-3xl tracking-[0.8em] md:tracking-[1.2em] font-black text-[#3D2B1F] uppercase border-t-[2px] md:border-t-[4px] border-[#3D2B1F] pt-2 md:pt-4 leading-none">
-                    চিত্রবীথি
-                  </p>
-                  <p className="text-[8px] md:text-[11px] tracking-[0.3em] md:tracking-[0.6em] text-[#5C4033] uppercase mt-4 md:mt-6 font-bold opacity-70">
-                      CHITRABEETHI • THE FINE ART GALLERY — ESTD 2026
-                  </p>
+                <p className="text-lg md:text-3xl tracking-[0.8em] md:tracking-[1.2em] font-black text-[#3D2B1F] uppercase border-t-[2px] md:border-t-[4px] border-[#3D2B1F] pt-2 md:pt-4 leading-none">
+                  চিত্রবীথি
+                </p>
+                <p className="text-[8px] md:text-[11px] tracking-[0.3em] md:tracking-[0.6em] text-[#5C4033] uppercase mt-4 md:mt-6 font-bold opacity-70">
+                    CHITRABEETHI • THE FINE ART GALLERY — ESTD 2026
+                </p>
               </div>
             </motion.div>
           </div>
@@ -122,8 +140,8 @@ export default function Home() {
               </p>
               <div className="mt-6 md:mt-8 flex flex-wrap gap-3 md:gap-4 justify-center lg:justify-start">
                 <button 
-                  onClick={() => window.location.href = '/browse'}
-                  className="bg-[#3D2B1F] text-[#E2B4BD] text-[9px] md:text-[10px] py-3 md:py-4 px-8 md:px-10 rounded-full uppercase tracking-widest font-black hover:bg-[#8A9A5B] hover:text-[#3D2B1F] transition-all duration-300 shadow-xl"
+                  onClick={() => router.push('/browse')}
+                  className="bg-[#3D2B1F] text-[#E2B4BD] text-[9px] md:text-[10px] py-3 md:py-4 px-8 md:px-10 rounded-full uppercase tracking-widest font-black hover:bg-[#8A9A5B] hover:text-[#3D2B1F] transition-all duration-300 shadow-xl cursor-pointer"
                 >
                   Browse Artworks
                 </button>
@@ -135,15 +153,15 @@ export default function Home() {
           </div>
         </section>
 
-        {/* --- STICKY FILTER --- */}
+        {/* --- STICKY FILTER NAVIGATION BAR --- */}
         <div className="sticky top-0 z-50 w-full py-6 md:py-10 flex justify-center bg-[#FDFBF7]/95 backdrop-blur-lg border-b border-[#3D2B1F]/10">
           <div className="bg-[#3D2B1F] p-1.5 md:p-2 rounded-full flex gap-1 shadow-lg">
-            {[ 'Canvas', 'Paper' ].map((cat) => (
+            {["All", "Canvas", "Paper", "Painting", "Acrylic Art"].map((cat) => (
               <button 
                 key={cat} 
-                onClick={() => setFilter(cat)}
-                className={`px-8 md:px-12 py-3 md:py-4 rounded-full text-[10px] md:text-[11px] uppercase tracking-[0.2em] md:tracking-[0.3em] font-black transition-all duration-500
-                ${filter === cat 
+                onClick={() => setSelectedCategory(cat)}
+                className={`px-6 md:px-10 py-3 md:py-3.5 rounded-full text-[10px] md:text-[11px] uppercase tracking-[0.15em] md:tracking-[0.25em] font-black transition-all duration-500 cursor-pointer
+                ${selectedCategory === cat 
                   ? 'bg-[#E2B4BD] text-[#3D2B1F] scale-105 shadow-xl' 
                   : 'bg-transparent text-[#E2B4BD]/60 hover:text-white hover:bg-white/5'}`}
               >
@@ -153,87 +171,106 @@ export default function Home() {
           </div>
         </div>
 
-        {/* --- ARTWORK CARD GRID --- */}
-        <section className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-y-36 md:gap-y-48 gap-x-14 mt-32 md:mt-44 px-6 md:px-10">
-          <AnimatePresence mode="popLayout">
-            {filteredArtworks.map((artwork) => {
-              const quantity = quantities[artwork.id] || 0;
-              const displayVal = editingId === artwork.id ? tempValue : quantity;
+        {/* --- ARTWORK SHOWCASE DYNAMIC GRID --- */}
+        <section className="max-w-7xl mx-auto px-6 md:px-10 mt-16">
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center py-32 gap-3 text-[#3D2B1F]/60">
+              <Loader2 className="animate-spin" size={32} />
+              <p className="text-xs uppercase font-black tracking-widest">Unlocking the Art Vault...</p>
+            </div>
+          ) : filteredArtworks.length === 0 ? (
+            <div className="bg-[#3D2B1F]/5 border-3 border-dashed border-[#3D2B1F]/20 rounded-[40px] py-24 text-center">
+              <Inbox className="mx-auto text-[#3D2B1F]/20 mb-4" size={40} />
+              <p className="text-xs font-black uppercase tracking-widest text-[#3D2B1F]/50">No fine artworks found in this collection category</p>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-12 mt-8">
+                <AnimatePresence mode="popLayout">
+                  {filteredArtworks.map((art, index) => {
+                    const bgColor = CARD_BG_COLORS[index % CARD_BG_COLORS.length];
+                    const productUrl = `/product-details/${art._id}`;
 
-              return (
-                <motion.div 
-                  key={artwork.id}
-                  layout
-                  initial={{ opacity: 0, scale: 0.9, y: 40 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.8, y: 20 }}
-                  transition={{ duration: 0.4, ease: "easeOut" }}
-                  whileHover={{ y: -10 }}
-                  className="relative bg-[#3D2B1F] rounded-[40px] md:rounded-[60px] p-6 md:p-8 pt-28 md:pt-36 flex flex-col items-center group shadow-2xl border border-white/5"
-                >
-                  <div className="absolute -top-24 md:-top-32 w-56 h-56 md:w-72 md:h-72 flex items-center justify-center">
-                      <div className="absolute inset-0 bg-[#8A9A5B]/20 rounded-full blur-xl group-hover:bg-[#8A9A5B]/40 transition-all duration-700" />
-                      <div className="relative w-48 h-48 md:w-64 md:h-64 rounded-full border-[6px] md:border-[8px] border-[#3D2B1F] bg-[#E2B4BD] overflow-hidden shadow-xl group-hover:scale-105 transition-transform duration-700 ease-out">
-                          <img src={artwork.img} alt={artwork.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000" />
-                          <div className="absolute inset-0 bg-gradient-to-tr from-[#3D2B1F]/20 to-transparent pointer-events-none" />
-                      </div>
-                  </div>
-
-                  <div className="text-center w-full mb-6 md:mb-8">
-                    <span className="text-[#8A9A5B] text-[8px] md:text-[9px] font-black tracking-[0.3em] md:tracking-[0.4em] uppercase mb-1 md:mb-2 block">{artwork.tag}</span>
-                    <h3 className="text-[#E2B4BD] font-black text-xl md:text-2xl tracking-[0.05em] uppercase italic leading-tight">{artwork.name}</h3>
-                    <p className="text-[9px] md:text-[10px] text-[#E2B4BD]/60 mt-3 md:mt-4 leading-relaxed px-2 md:px-4 uppercase tracking-[0.1em] font-medium opacity-70">
-                      Finished with premium museum glazing. Includes Certificate of Authenticity.
-                    </p>
-                  </div>
-
-                  <div className="mt-auto w-full flex items-center justify-between bg-white/5 rounded-[25px] md:rounded-[30px] p-1.5 md:p-2 border border-white/5">
-                    <div className="flex-1 py-2 md:py-3 px-4 md:px-6 rounded-[20px] md:rounded-[24px] bg-gradient-to-r from-[#8A9A5B] to-[#5C4033] shadow-lg">
-                        <span className="text-[#E2B4BD] font-black text-xl md:text-2xl italic tracking-tighter font-sans">৳{artwork.price.toLocaleString()}</span>
-                    </div>
-                    
-                    <div className="flex items-center gap-1 ml-2">
-                      <AnimatePresence mode="wait">
-                        {(quantity > 0 || editingId === artwork.id) ? (
-                          <motion.div 
-                            key="qty-controls"
-                            initial={{ opacity: 0, x: 10 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: 10 }}
-                            className="flex items-center bg-[#E2B4BD] rounded-[18px] md:rounded-[22px] p-1 shadow-lg"
-                          >
-                            <button onClick={() => updateQty(artwork.id, -1)} className="w-8 h-8 md:w-10 md:h-10 flex items-center justify-center text-[#3D2B1F] font-black text-lg hover:text-[#8A9A5B] transition-colors">-</button>
-                            <input 
-                              type="text"
-                              value={displayVal}
-                              onFocus={() => { setEditingId(artwork.id); setTempValue(quantity.toString()); }}
-                              onChange={(e) => handleInputChange(e.target.value)}
-                              onBlur={() => handleBlur(artwork.id)}
-                              className="w-8 md:w-10 text-center bg-transparent text-[#3D2B1F] font-black text-xs md:text-sm border-none focus:outline-none focus:ring-0 p-0"
+                    return (
+                      <motion.div
+                        key={art._id}
+                        layout
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+                        className={`rounded-[32px] p-5 flex flex-col justify-between border-2 border-[#3D2B1F]/10 shadow-sm hover:shadow-xl hover:border-[#3D2B1F] transition-all group ${bgColor}`}
+                      >
+                        <div>
+                          {/* Artwork Frame Canvas Container */}
+                          <div className="relative aspect-square w-full rounded-2xl overflow-hidden border-2 border-[#3D2B1F] bg-white shadow-inner">
+                            <img 
+                              src={art.img} 
+                              alt={art.name} 
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out" 
                             />
-                            <button onClick={() => updateQty(artwork.id, 1)} className="w-8 h-8 md:w-10 md:h-10 flex items-center justify-center text-[#3D2B1F] font-black text-lg hover:text-[#8A9A5B] transition-colors">+</button>
-                          </motion.div>
-                        ) : (
-                          <motion.button 
-                            key="add-btn"
-                            initial={{ opacity: 0, scale: 0.5 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.5 }}
-                            whileHover={{ scale: 1.05, backgroundColor: "#8A9A5B", color: "#3D2B1F" }}
-                            whileTap={{ scale: 0.95 }}
-                            onClick={() => updateQty(artwork.id, 1)}
-                            className="w-12 h-12 md:w-16 md:h-16 bg-[#E2B4BD] rounded-[18px] md:rounded-[22px] flex items-center justify-center text-[#3D2B1F] font-black text-xl md:text-2xl shadow-lg transition-colors cursor-pointer"
+                            <span className="absolute top-3 left-3 bg-[#3D2B1F] text-[#FAECF0] text-[8px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg shadow-md border border-white/10">
+                              {art.tag || art.category}
+                            </span>
+                          </div>
+
+                          {/* Title and Backstory Lore Context */}
+                          <div className="mt-5 space-y-1.5">
+                            <h3 className="text-[#3D2B1F] font-black text-lg uppercase tracking-tight line-clamp-1 group-hover:text-[#8A9A5B] transition-colors">
+                              {art.name}
+                            </h3>
+                            <p className="text-[11px] font-medium text-[#5C4033]/80 tracking-wide line-clamp-2 leading-relaxed">
+                              {art.description || "Finished with premium museum archive glazing. Includes custom Certificate of Authenticity."}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Controls Base Section */}
+                        <div className="mt-6 space-y-3">
+                          <div className="flex items-center justify-between border-b-2 border-[#3D2B1F]/10 pb-2.5 mb-1">
+                            <span className="text-[9px] font-black uppercase tracking-widest text-[#3D2B1F]/50">Investment Value</span>
+                            <span className="text-[#3D2B1F] font-black text-xl italic font-sans">৳{art.price.toLocaleString()}</span>
+                          </div>
+
+                          {art.status !== "sold" ? (
+                            <button 
+                              type="button" 
+                              className="w-full bg-[#3D2B1F] text-[#FAECF0] py-3 rounded-2xl flex items-center justify-center gap-2 hover:bg-[#8A9A5B] hover:text-[#3D2B1F] transition-all active:scale-95 shadow-sm font-black uppercase text-[10px] tracking-widest cursor-pointer"
+                            >
+                              <Plus size={14} strokeWidth={3} />
+                              <span>Acquire Artwork</span>
+                            </button>
+                          ) : (
+                            <div className="w-full bg-[#8A3324]/10 text-[#8A3324] border border-[#8A3324]/20 py-3 rounded-2xl flex items-center justify-center gap-2 font-black uppercase text-[10px] tracking-widest select-none cursor-not-allowed">
+                              Unavailable / Sold out
+                            </div>
+                          )}
+                          
+                          <Link 
+                            href={productUrl} 
+                            className="w-full border-2 border-[#3D2B1F]/20 text-[#3D2B1F] py-3 rounded-2xl flex items-center justify-center gap-2 hover:bg-[#3D2B1F] hover:text-white transition-all uppercase text-[9px] font-black tracking-[0.2em]"
                           >
-                            +
-                          </motion.button>
-                        )}
-                      </AnimatePresence>
-                    </div>
-                  </div>
-                </motion.div>
-              );
-            })}
-          </AnimatePresence>
+                            <Eye size={14} /> Inspect Details
+                          </Link>
+                        </div>
+
+                      </motion.div>
+                    );
+                  })}
+                </AnimatePresence>
+              </div>
+
+              {/* --- VIEW MORE ARTWORKS LINK BUTTON --- */}
+              <div className="flex justify-center mt-16">
+                <Link
+                  href="/browse"
+                  className="inline-flex items-center justify-center border-2 border-[#3D2B1F] bg-transparent text-[#3D2B1F] text-[10px] md:text-[11px] font-black uppercase tracking-[0.25em] py-4 px-12 rounded-full hover:bg-[#3D2B1F] hover:text-[#E2B4BD] transition-all duration-300 shadow-sm hover:shadow-lg active:scale-95"
+                >
+                  View More Artworks
+                </Link>
+              </div>
+            </>
+          )}
         </section>
       </main>
     </>
