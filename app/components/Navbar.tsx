@@ -44,7 +44,6 @@ export default function Header() {
   ];
 
   // 🌟 DYNAMIC PROFILE PATH LOGIC
-  // Artists go to /profile/artist/[id]/ while users/admins go to /profile
   const getProfileHref = () => {
     if (!user) return "/profile";
     return user.role === "artist" ? `/profile/artist/${user._id || user.id}/` : "/profile";
@@ -60,7 +59,7 @@ export default function Header() {
           
           {/* --- LAYER 1: DECORATIVE BRANCHES (ANIMATION FIX) --- */}
           <motion.div 
-            initial={{ opacity: 0, y: 0 }} // 🌟 FIXED: Explicit baseline y coordinate prevents layout calculation jumps
+            initial={{ opacity: 0, y: 0 }} 
             animate={{ 
               y: isScrolled ? -20 : 0, 
               opacity: isScrolled ? 0 : 0.9
@@ -68,7 +67,7 @@ export default function Header() {
             transition={{ 
               duration: 0.4, 
               ease: "easeOut",
-              layout: { type: "tween" } // 🌟 FIXED: Prevents Next.js route switching from running auto layout scaling
+              layout: { type: "tween" } 
             }}
             className="absolute inset-x-0 top-0 h-full z-0 overflow-visible"
           >
@@ -123,7 +122,7 @@ export default function Header() {
                       transformOrigin: "top center" 
                     }}
                     whileHover={isScrolled ? { scale: 1.05 } : { scale: 1.05, rotate: 3 }}
-                    className="flex flex-col items-center"
+                    className="flex flex-col items-center justify-start"
                   >
                     <motion.div animate={{ height: isScrolled ? 0 : 32, opacity: isScrolled ? 0 : 0.6 }} className="w-[1.5px] bg-[#3D2B1F]" />
                     <Link href={link.href} className={`px-3 py-2 transition-all duration-300 font-black uppercase tracking-[0.2em] text-[10px] whitespace-nowrap ${
@@ -150,11 +149,13 @@ export default function Header() {
                 <motion.div 
                   animate={{ scale: isScrolled ? 0.85 : 1, y: isScrolled ? -9 : 0, borderWidth: isScrolled ? "3px" : "4px" }}
                   transition={{ type: "spring", stiffness: 120, damping: 20 }}
-                  className="relative w-14 h-14 md:w-16 md:h-16 rounded-full flex items-center justify-center overflow-hidden transition-all duration-300 shadow-xl bg-[#3D2B1F] border-[#E2B4BD] p-1.5 z-10"
+                  className="relative w-14 h-14 md:w-16 md:h-16 rounded-full flex items-center justify-center overflow-hidden transition-all duration-300 shadow-xl bg-[#3D2B1F] border-[#E2B4BD] p-0 z-10"
                 >
-                  <svg className="w-full h-full text-[#E2B4BD] transform group-hover:rotate-12 transition-transform duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9.53 16.122l9.37-9.37a2.25 2.25 0 113.182 3.182l-9.37 9.371a6 6 0 01-2.122 1.39l-2.06.515.515-2.061a6 6 0 011.383-2.112zm0 0L19 7m-4.75 2.75l1.5 1.5M3 21v-1.5A3.75 3.75 0 016.75 16h0A3.75 3.75 0 0110 19.75V21H3z" />
-                  </svg>
+                  <img 
+                    src="/img/logo.png" 
+                    alt="Logo" 
+                    className="w-full h-full object-cover transform group-hover:rotate-12 transition-transform duration-500"
+                  />
                 </motion.div>
               </Link>
             </div>
@@ -172,9 +173,9 @@ export default function Header() {
                         transformOrigin: "top center" 
                       }}
                       whileHover={isScrolled ? { scale: 1.05 } : { scale: 1.05, rotate: -3 }}
-                      className="flex flex-col items-center"
+                      className="flex flex-col items-center justify-start"
                     >
-                      <motion.div animate={{ height: isScrolled ? 0 : 44, opacity: isScrolled ? 0 : 0.6 }} className="w-[1.5px] bg-[#3D2B1F]" />
+                      <motion.div animate={{ height: isScrolled ? 0 : 32, opacity: isScrolled ? 0 : 0.6 }} className="w-[1.5px] bg-[#3D2B1F]" />
                       <Link 
                         href={`/dashboard/${user.role}`}
                         className={`px-3 py-2 transition-all duration-300 font-black uppercase tracking-[0.2em] text-[9px] ${
@@ -201,9 +202,9 @@ export default function Header() {
                         transformOrigin: "top center" 
                       }}
                       whileHover={isScrolled ? { scale: 1.05 } : { scale: 1.05, rotate: -3 }}
-                      className="flex flex-col items-center"
+                      className="flex flex-col items-center justify-start"
                     >
-                      <motion.div animate={{ height: isScrolled ? 0 : 44, opacity: isScrolled ? 0 : 0.6 }} className="w-[1.5px] bg-[#3D2B1F]" />
+                      <motion.div animate={{ height: isScrolled ? 0 : 32, opacity: isScrolled ? 0 : 0.6 }} className="w-[1.5px] bg-[#3D2B1F]" />
                       <Link 
                         href="/login"
                         className={`px-3 py-2 transition-all duration-300 font-black uppercase tracking-[0.2em] text-[9px] ${
@@ -230,9 +231,9 @@ export default function Header() {
                         transformOrigin: "top center" 
                       }}
                       whileHover={isScrolled ? { scale: 1.05 } : { scale: 1.05, rotate: -3 }}
-                      className="flex flex-col items-center"
+                      className="flex flex-col items-center justify-start"
                     >
-                      <motion.div animate={{ height: isScrolled ? 0 : 44, opacity: isScrolled ? 0 : 0.6 }} className="w-[1.5px] bg-[#3D2B1F]" />
+                      <motion.div animate={{ height: isScrolled ? 0 : 32, opacity: isScrolled ? 0 : 0.6 }} className="w-[1.5px] bg-[#3D2B1F]" />
                       <Link 
                         href="/register"
                         className={`px-3 py-2 transition-all duration-300 font-black uppercase tracking-[0.2em] text-[9px] ${
@@ -252,7 +253,7 @@ export default function Header() {
                 </div>
               )}
 
-              {/* DYNAMIC PROFILE AVATAR WRAPPER */}
+              {/* DYNAMIC PROFILE AVATAR & EXIT WRAPPER */}
               {user && (
                 <motion.div
                   animate={{ y: isScrolled ? -2 : 0 }}
@@ -260,46 +261,45 @@ export default function Header() {
                     rotate: !isMounted || isScrolled ? 0 : smoothRotation, 
                     transformOrigin: "top center" 
                   }}
-                  className="flex items-center gap-3 pl-1 relative"
+                  className="flex flex-col items-center justify-start"
                 >
-                  <div className="absolute top-0 left-6 flex flex-col items-center pointer-events-none">
-                    <motion.div animate={{ height: isScrolled ? 0 : 24, opacity: isScrolled ? 0 : 0.6 }} className="w-[1.5px] bg-[#3D2B1F]" />
-                  </div>
+                  <motion.div animate={{ height: isScrolled ? 0 : 32, opacity: isScrolled ? 0 : 0.6 }} className="w-[1.5px] bg-[#3D2B1F]" />
                   
-                  <div className="relative w-11 h-11 md:w-12 md:h-12 mt-6 md:mt-0 flex items-center justify-center">
-                    {/* 🌟 FIXED: Target updated to use dynamic profile route based on layout needs */}
-                    <Link href={dynamicProfileHref} className="block w-full h-full rounded-full border-2 border-[#8A9A5B] bg-[#3D2B1F] flex items-center justify-center overflow-hidden transition-transform duration-300 hover:scale-105 shadow-md">
-                      {(user.profilePicture || user.photoUrl) ? (
-                        <img 
-                          src={`/api/proxy-avatar?url=${encodeURIComponent(user.profilePicture || user.photoUrl)}`} 
-                          alt={user.name || "User Avatar"} 
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).style.display = 'none';
-                          }}
-                        />
-                      ) : (
-                        <span className="text-sm font-black uppercase text-[#E2B4BD]">
-                          {user.name ? user.name.charAt(0) : <User size={16} />}
-                        </span>
-                      )}
-                    </Link>
-                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="relative w-11 h-11 md:w-12 md:h-12 flex items-center justify-center">
+                      <Link href={dynamicProfileHref} className="block w-full h-full rounded-full border-2 border-[#8A9A5B] bg-[#3D2B1F] flex items-center justify-center overflow-hidden transition-transform duration-300 hover:scale-105 shadow-md">
+                        {(user.profilePicture || user.photoUrl) ? (
+                          <img 
+                            src={`/api/proxy-avatar?url=${encodeURIComponent(user.profilePicture || user.photoUrl)}`} 
+                            alt={user.name || "User Avatar"} 
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).style.display = 'none';
+                            }}
+                          />
+                        ) : (
+                          <span className="text-sm font-black uppercase text-[#E2B4BD]">
+                            {user.name ? user.name.charAt(0) : <User size={16} />}
+                          </span>
+                        )}
+                      </Link>
+                    </div>
 
-                  {token && (
-                    <motion.button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        logout();
-                      }}
-                      title="Exit Account"
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.95 }}
-                      className="flex items-center justify-center bg-[#8A3324] hover:bg-[#a13d2b] text-[#FAECF0] w-7 h-7 md:w-8 md:h-8 rounded-full shadow border border-[#3D2B1F] transition-colors pointer-events-auto mt-6 md:mt-0"
-                    >
-                      <LogOut size={12} strokeWidth={2.5} />
-                    </motion.button>
-                  )}
+                    {token && (
+                      <motion.button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          logout();
+                        }}
+                        title="Exit Account"
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.95 }}
+                        className="flex items-center justify-center bg-[#8A3324] hover:bg-[#a13d2b] text-[#FAECF0] w-9 h-9 md:w-10 md:h-10 rounded-full shadow border border-[#3D2B1F] transition-colors pointer-events-auto"
+                      >
+                        <LogOut size={14} strokeWidth={2.5} />
+                      </motion.button>
+                    )}
+                  </div>
                 </motion.div>
               )}
             </div>
@@ -357,7 +357,6 @@ export default function Header() {
                     >
                       Dashboard <ArrowRight className="text-[#8A9A5B]" />
                     </Link>
-                    {/* 🌟 FIXED: Mobile drawer profile anchor altered for correct dynamic structural layout */}
                     <Link 
                       href={dynamicProfileHref}
                       onClick={() => setMobileMenuOpen(false)} 

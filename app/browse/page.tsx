@@ -1,15 +1,16 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Heart, Sparkles, Plus, Eye, Inbox, ArrowUpDown, SlidersHorizontal } from "lucide-react";
+import { Search, Heart, Sparkles, Plus, Eye, Inbox, ArrowUpDown, SlidersHorizontal, ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { getArtworks, ArtworkData } from "../../utils/api";
 import { useAuth } from "../context/AuthContext"; 
 import { useSharedWishlist } from "../../utils/WishlistContext"; 
 
 const CATEGORIES = ["All", "Painting", "Acrylic Art", "Sculpture", "Photography"];
+const ITEMS_PER_PAGE = 8; // Adjust this number to control how many artworks show per page
 
 const CARD_BG_COLORS = [
   "bg-[#F4EFE6]", 
@@ -18,8 +19,9 @@ const CARD_BG_COLORS = [
   "bg-[#F9F6F0]", 
 ];
 
-export default function BrowseArtworksPage() {
+function BrowseArtworksContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   
   // Connect to global system contexts
   const { user } = useAuth();
@@ -34,6 +36,9 @@ export default function BrowseArtworksPage() {
   const [maxPrice, setMaxPrice] = useState<number | "">("");
   const [sortBy, setSortBy] = useState<string>("newest"); // options: newest, price-low, price-high
 
+  // --- PAGINATION STATE ---
+  const [currentPage, setCurrentPage] = useState(1);
+
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
 
@@ -41,7 +46,30 @@ export default function BrowseArtworksPage() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [toastType, setToastType] = useState<"success" | "info">("success");
 
-  // --- CONNECT TO BACKEND DATA PIPELINE & RANDOMIZE ---
+  // --- READ CATEGORY QUERY FROM URL PARAMETERS & CLEAR AFTER 1 SECOND ---
+  useEffect(() => {
+    const categoryParam = searchParams.get("category");
+    if (categoryParam) {
+      // Find matching category format from allowed CATEGORIES structure safely
+      const matchedCategory = CATEGORIES.find(
+        (cat) => cat.toLowerCase() === categoryParam.toLowerCase()
+      );
+      if (matchedCategory) {
+        setSelectedCategory(matchedCategory);
+      }
+
+      // Timer to wipe the extended URL parameters after 1 second (1000ms)
+      const urlClearTimer = setTimeout(() => {
+        // Obtains current clean pathname without the query strings (e.g., "/browse")
+        const pathname = window.location.pathname;
+        window.history.replaceState(null, "", pathname);
+      }, 1000);
+
+      return () => clearTimeout(urlClearTimer);
+    }
+  }, [searchParams]);
+
+  // --- CONNECT TO BACKEND DATA PIPELINE & RANDOMIZE WITH FORCE REFRESH TRIGGER ---
   useEffect(() => {
     let isMounted = true;
     async function loadData() {
@@ -49,12 +77,19 @@ export default function BrowseArtworksPage() {
         setIsLoading(true);
         setHasError(false);
         
+        // Pass a cache-busting query parameter if getArtworks supports strings/params,
+        // or ensure it bypasses Next.js fetch caching layer.
         const artData = await getArtworks();
         
         if (isMounted) {
-          // Requirements rule: Randomize array elements on each initial page load
+          // Force a strict deep-copy clone and apply a clean Fisher-Yates or Math.random shuffle
           const randomizedData = [...artData].sort(() => Math.random() - 0.5);
-          setArtworks(randomizedData);
+          
+          // Clear current state first to force a refresh trigger, then apply
+          setArtworks([]);
+          setTimeout(() => {
+            if (isMounted) setArtworks(randomizedData);
+          }, 0);
         }
       } catch (err) {
         console.error("Data synchronization error:", err);
@@ -68,6 +103,11 @@ export default function BrowseArtworksPage() {
       isMounted = false;
     };
   }, []);
+
+  // --- RESET TO PAGE 1 ON FILTER CHANGES ---
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedCategory, minPrice, maxPrice, sortBy]);
 
   // --- TOAST TRIGGER ENGINE ---
   const showToast = (message: string, type: "success" | "info" = "success") => {
@@ -138,6 +178,12 @@ export default function BrowseArtworksPage() {
       }
       return 0;
     });
+
+  // --- PAGINATION CALCULATION PIPELINE ---
+  const totalItems = filteredAndSortedArtworks.length;
+  const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const paginatedArtworks = filteredAndSortedArtworks.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
   return (
     <div className="min-h-screen bg-[#FDFBF7] text-[#3D2B1F] pt-32 pb-24 px-4 md:px-12 relative overflow-hidden font-sans select-none">
@@ -301,134 +347,192 @@ export default function BrowseArtworksPage() {
           </motion.div>
         )}
 
-        {/* --- ARTWORKS RECONSTRUCTED GRID --- */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-8 gap-y-20">
-          <AnimatePresence mode="popLayout">
-            {isLoading ? (
-              Array.from({ length: 4 }).map((_, index) => (
-                <motion.div 
-                  key={`skeleton-${index}`}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="bg-white/50 backdrop-blur-sm rounded-[32px] p-4 border border-[#3D2B1F]/5 animate-pulse"
-                >
-                  <div className="w-full aspect-square bg-[#3D2B1F]/5 rounded-[24px] mb-4" />
-                  <div className="h-4 bg-[#3D2B1F]/10 rounded w-2/3 mb-2 mx-auto" />
-                  <div className="h-3 bg-[#3D2B1F]/5 rounded w-1/2 mb-4 mx-auto" />
-                </motion.div>
-              ))
-            ) : (
-              filteredAndSortedArtworks.map((art, index) => {
-                if (!art || !art._id) return null;
-                
-                const productUrl = `/product-details/${art._id}`;
-                const cardBg = CARD_BG_COLORS[index % CARD_BG_COLORS.length];
-                const isWishlisted = wishlist?.includes(art._id) || false;
-
-                return (
-                  <motion.div
-                    key={art._id}
-                    layout
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
-                    whileHover={{ y: -10 }}
-                    transition={{ duration: 0.4, ease: [0.25, 1, 0.5, 1] }}
-                    className={`group relative ${cardBg} border-[3px] border-[#3D2B1F] rounded-[35px] p-6 shadow-[8px_8px_0px_0px_#3D2B1F] h-full flex flex-col justify-between`}
+        {/* --- ARTWORKS RESPONSIBLE SCROLL / SLIDER CONTAINER GRID --- */}
+        <div className="max-h-[75vh] overflow-y-auto pr-2 md:max-h-none md:overflow-visible md:pr-0 [scrollbar-width:thin] [scrollbar-color:#3D2B1F_transparent]">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-8 gap-y-20 pt-4 pb-12">
+            <AnimatePresence mode="popLayout">
+              {isLoading ? (
+                Array.from({ length: 4 }).map((_, index) => (
+                  <motion.div 
+                    key={`skeleton-${index}`}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="bg-white/50 backdrop-blur-sm rounded-[32px] p-4 border border-[#3D2B1F]/5 animate-pulse"
                   >
-                    {/* Status Badge Overlays */}
-                    {art.status === "sold" ? (
-                      <div className="absolute -top-3 -left-3 bg-[#8A3324] text-[#FAECF0] px-4 py-1 rounded-full text-[8px] font-black uppercase tracking-wider border-2 border-[#3D2B1F] rotate-[-5deg] z-20 shadow-sm animate-pulse">
-                        Sold Out 🍂
-                      </div>
-                    ) : (
-                      <div className="absolute -top-3 -left-3 bg-[#8A9A5B] text-[#3D2B1F] px-4 py-1 rounded-full text-[8px] font-black uppercase tracking-wider border-2 border-[#3D2B1F] rotate-[-5deg] z-20">
-                        Available ✨
-                      </div>
-                    )}
-
-                    {/* Interactive Price Floating Badge */}
-                    <div className="absolute -top-3 -right-3 bg-[#3D2B1F] text-[#FAECF0] w-14 h-14 rounded-full flex items-center justify-center font-black text-[10px] rotate-12 border-2 border-[#FDFBF7] shadow-md z-10">
-                      ৳{art.price}
-                    </div>
-
-                    {/* Image Box Inner Container Frame */}
-                    <Link href={productUrl} className="w-full aspect-square bg-[#3D2B1F]/5 rounded-[25px] border-2 border-[#3D2B1F]/10 mb-6 overflow-hidden flex items-center justify-center relative p-0 cursor-pointer">
-                      <motion.img 
-                        whileHover={{ scale: 1.1, rotate: 3 }}
-                        transition={{ duration: 0.4 }}
-                        src={art.img} 
-                        alt={art.name || "Artwork Image"} 
-                        className={`w-full h-full object-cover drop-shadow-md ${art.status === "sold" ? "grayscale opacity-60" : ""}`}
-                      />
-                      
-                      {/* Floating Absolute Heart Action Over Media Frame */}
-                      <div className="absolute bottom-3 right-3 z-20">
-                        <motion.button
-                          type="button"
-                          whileTap={{ scale: 0.85 }}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            onWishlistToggleClick(art._id, art.name || "Untitled Artwork");
-                          }}
-                          className={`p-2 rounded-full border shadow-sm transition-all backdrop-blur-md ${
-                            isWishlisted
-                              ? "bg-[#3D2B1F] border-[#3D2B1F] text-[#FDFBF7]" 
-                              : "bg-[#FAECF0]/90 border-[#3D2B1F]/20 text-[#3D2B1F] hover:border-[#E2B4BD] hover:text-[#E2B4BD]"
-                          }`}
-                        >
-                          <Heart 
-                            size={14} 
-                            fill={isWishlisted ? "currentColor" : "none"} 
-                            strokeWidth={2.5} 
-                          />
-                        </motion.button>
-                      </div>
-                    </Link>
-
-                    {/* Content Detail Info Wrapper */}
-                    <div className="flex-1 flex flex-col justify-between">
-                      <div>
-                        <span className="text-[#8A9A5B] text-[9px] font-black tracking-[0.3em] uppercase block mb-1.5">
-                          {art.tag || art.category}
-                        </span>
-                        <h4 className={`text-2xl italic font-bold lowercase tracking-tighter mb-1 text-[#2C1D11] ${art.status === "sold" ? "line-through opacity-50" : ""}`}>
-                          {art.name}
-                        </h4>
-                        <p className="text-xs font-sans font-medium opacity-70 tracking-wide">
-                          by {art.artist?.name || "Independent Artist"}
-                        </p>
-                      </div>
-
-                      {/* Interactive Dual Action Row Stack */}
-                      <div className="mt-6 space-y-3">
-                        {art.status !== "sold" ? (
-                          <button type="button" className="w-full bg-[#3D2B1F] text-[#FAECF0] py-3 rounded-2xl flex items-center justify-center gap-2 hover:bg-[#3D2B1F]/90 transition-all active:scale-95 shadow-sm">
-                            <Plus size={14} strokeWidth={3} />
-                            <span className="uppercase text-[10px] font-black tracking-widest">Acquire Artwork</span>
-                          </button>
-                        ) : (
-                          <div className="w-full bg-[#8A3324]/10 text-[#8A3324] border border-[#8A3324]/20 py-3 rounded-2xl flex items-center justify-center gap-2 font-black uppercase text-[10px] tracking-widest select-none cursor-not-allowed">
-                            Unavailable / Sold out
-                          </div>
-                        )}
-                        
-                        <Link href={productUrl} className="w-full border-2 border-[#3D2B1F]/20 text-[#3D2B1F] py-3 rounded-2xl flex items-center justify-center gap-2 hover:bg-[#3D2B1F]/5 transition-all uppercase text-[9px] font-black tracking-[0.2em]">
-                          <Eye size={14} /> Inspect Details
-                        </Link>
-                      </div>
-                    </div>
-
+                    <div className="w-full aspect-square bg-[#3D2B1F]/5 rounded-[24px] mb-4" />
+                    <div className="h-4 bg-[#3D2B1F]/10 rounded w-2/3 mb-2 mx-auto" />
+                    <div className="h-3 bg-[#3D2B1F]/5 rounded w-1/2 mb-4 mx-auto" />
                   </motion.div>
-                );
-              })
-            )}
-          </AnimatePresence>
+                ))
+              ) : (
+                paginatedArtworks.map((art, index) => {
+                  if (!art || !art._id) return null;
+                  
+                  const productUrl = `/product-details/${art._id}`;
+                  const cardBg = CARD_BG_COLORS[index % CARD_BG_COLORS.length];
+                  const isWishlisted = wishlist?.includes(art._id) || false;
+
+                  return (
+                    <motion.div
+                      key={art._id}
+                      layout
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.95 }}
+                      whileHover={{ y: -10 }}
+                      transition={{ duration: 0.4, ease: [0.25, 1, 0.5, 1] }}
+                      className={`group relative ${cardBg} border-[3px] border-[#3D2B1F] rounded-[35px] p-6 shadow-[8px_8px_0px_0px_#3D2B1F] h-full flex flex-col justify-between`}
+                    >
+                      {/* Status Badge Overlays */}
+                      {art.status === "sold" ? (
+                        <div className="absolute -top-3 -left-3 bg-[#8A3324] text-[#FAECF0] px-4 py-1 rounded-full text-[8px] font-black uppercase tracking-wider border-2 border-[#3D2B1F] rotate-[-5deg] z-20 shadow-sm animate-pulse">
+                          Sold Out 🍂
+                        </div>
+                      ) : (
+                        <div className="absolute -top-3 -left-3 bg-[#8A9A5B] text-[#3D2B1F] px-4 py-1 rounded-full text-[8px] font-black uppercase tracking-wider border-2 border-[#3D2B1F] rotate-[-5deg] z-20">
+                          Available ✨
+                        </div>
+                      )}
+
+                      {/* Interactive Price Floating Badge */}
+                      <div className="absolute -top-3 -right-3 bg-[#3D2B1F] text-[#FAECF0] w-14 h-14 rounded-full flex items-center justify-center font-black text-[10px] rotate-12 border-2 border-[#FDFBF7] shadow-md z-10">
+                        ৳{art.price}
+                      </div>
+
+                      {/* Image Box Inner Container Frame */}
+                      <Link href={productUrl} className="w-full aspect-square bg-[#3D2B1F]/5 rounded-[25px] border-2 border-[#3D2B1F]/10 mb-6 overflow-hidden flex items-center justify-center relative p-0 cursor-pointer">
+                        <motion.img 
+                          whileHover={{ scale: 1.1, rotate: 3 }}
+                          transition={{ duration: 0.4 }}
+                          src={art.img} 
+                          alt={art.name || "Artwork Image"} 
+                          className={`w-full h-full object-cover drop-shadow-md ${art.status === "sold" ? "grayscale opacity-60" : ""}`}
+                        />
+                        
+                        {/* Floating Absolute Heart Action Over Media Frame */}
+                        <div className="absolute bottom-3 right-3 z-20">
+                          <motion.button
+                            type="button"
+                            whileTap={{ scale: 0.85 }}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              onWishlistToggleClick(art._id, art.name || "Untitled Artwork");
+                            }}
+                            className={`p-2 rounded-full border shadow-sm transition-all backdrop-blur-md ${
+                              isWishlisted
+                                ? "bg-[#3D2B1F] border-[#3D2B1F] text-[#FDFBF7]" 
+                                : "bg-[#FAECF0]/90 border-[#3D2B1F]/20 text-[#3D2B1F] hover:border-[#E2B4BD] hover:text-[#E2B4BD]"
+                            }`}
+                          >
+                            <Heart 
+                              size={14} 
+                              fill={isWishlisted ? "currentColor" : "none"} 
+                              strokeWidth={2.5} 
+                            />
+                          </motion.button>
+                        </div>
+                      </Link>
+
+                      {/* Content Detail Info Wrapper */}
+                      <div className="flex-1 flex flex-col justify-between">
+                        <div>
+                          <span className="text-[#8A9A5B] text-[9px] font-black tracking-[0.3em] uppercase block mb-1.5">
+                            {art.tag || art.category}
+                          </span>
+                          <h4 className={`text-2xl italic font-bold lowercase tracking-tighter mb-1 text-[#2C1D11] ${art.status === "sold" ? "line-through opacity-50" : ""}`}>
+                            {art.name}
+                          </h4>
+                          <p className="text-xs font-sans font-medium opacity-70 tracking-wide">
+                            by {art.artist?.name || "Independent Artist"}
+                          </p>
+                        </div>
+
+                        {/* Interactive Dual Action Row Stack */}
+                        <div className="mt-6 space-y-3">
+                          {art.status !== "sold" ? (
+                            <button type="button" className="w-full bg-[#3D2B1F] text-[#FAECF0] py-3 rounded-2xl flex items-center justify-center gap-2 hover:bg-[#3D2B1F]/90 transition-all active:scale-95 shadow-sm">
+                              <Plus size={14} strokeWidth={3} />
+                              <span className="uppercase text-[10px] font-black tracking-widest">Acquire Artwork</span>
+                            </button>
+                          ) : (
+                            <div className="w-full bg-[#8A3324]/10 text-[#8A3324] border border-[#8A3324]/20 py-3 rounded-2xl flex items-center justify-center gap-2 font-black uppercase text-[10px] tracking-widest select-none cursor-not-allowed">
+                              Unavailable / Sold out
+                            </div>
+                          )}
+                          
+                          <Link href={productUrl} className="w-full border-2 border-[#3D2B1F]/20 text-[#3D2B1F] py-3 rounded-2xl flex items-center justify-center gap-2 hover:bg-[#3D2B1F]/5 transition-all uppercase text-[9px] font-black tracking-[0.2em]">
+                            <Eye size={14} /> Inspect Details
+                          </Link>
+                        </div>
+                      </div>
+
+                    </motion.div>
+                  );
+                })
+              )}
+            </AnimatePresence>
+          </div>
         </div>
+
+        {/* --- PAGE SLIDER CONTROLS (DESKTOP & LARGER SCREENS) --- */}
+        {!isLoading && !hasError && totalPages > 1 && (
+          <div className="hidden sm:flex items-center justify-center gap-3 mt-12">
+            <button
+              type="button"
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+              className="p-2.5 rounded-xl border border-[#3D2B1F]/10 bg-white text-[#3D2B1F] transition-all hover:border-[#3D2B1F] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:border-[#3D2B1F]/10 shadow-sm"
+            >
+              <ChevronLeft size={16} />
+            </button>
+
+            {Array.from({ length: totalPages }).map((_, i) => {
+              const pageNum = i + 1;
+              return (
+                <button
+                  key={pageNum}
+                  type="button"
+                  onClick={() => setCurrentPage(pageNum)}
+                  className={`w-10 h-10 rounded-xl text-xs font-black transition-all border ${
+                    currentPage === pageNum
+                      ? "bg-[#3D2B1F] text-[#FAECF0] border-[#3D2B1F] scale-105 shadow-md"
+                      : "bg-white text-[#3D2B1F] border-[#3D2B1F]/10 hover:border-[#3D2B1F]"
+                  }`}
+                >
+                  {pageNum}
+                </button>
+              );
+            })}
+
+            <button
+              type="button"
+              disabled={currentPage === totalPages}
+              onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+              className="p-2.5 rounded-xl border border-[#3D2B1F]/10 bg-white text-[#3D2B1F] transition-all hover:border-[#3D2B1F] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:border-[#3D2B1F]/10 shadow-sm"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        )}
 
       </div>
     </div>
+  );
+}
+
+// --- MAIN WRAPPER EXPORTED WITH NEXT.JS CLIENT SUSPENSE BOUNDARY ---
+export default function BrowseArtworksPage() {
+  return (
+    <Suspense 
+      fallback={
+        <div className="min-h-screen bg-[#FDFBF7] flex items-center justify-center text-xs font-black uppercase tracking-widest text-[#3D2B1F]/40">
+          Entering Gallery...
+        </div>
+      }
+    >
+      <BrowseArtworksContent />
+    </Suspense>
   );
 }

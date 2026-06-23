@@ -13,7 +13,8 @@ export interface ArtworkData {
   bengaliTitle?: string;
   description: string;
   price: number;
-  category: "Canvas" | "Paper";
+  // Updated to perfectly align with your browse page's filtering categories
+  category: "Painting" | "Acrylic Art" | "Sculpture" | "Photography" | "Canvas" | "Paper";
   img: string;
   tag: string;
   status: "available" | "sold" | "unpublished";
