@@ -269,10 +269,11 @@ export default function Header() {
                     <div className="relative w-11 h-11 md:w-12 md:h-12 flex items-center justify-center">
                       <Link href={dynamicProfileHref} className="block w-full h-full rounded-full border-2 border-[#8A9A5B] bg-[#3D2B1F] flex items-center justify-center overflow-hidden transition-transform duration-300 hover:scale-105 shadow-md">
                         {(user.profilePicture || user.photoUrl) ? (
-                          <img 
-                            src={`/api/proxy-avatar?url=${encodeURIComponent(user.profilePicture || user.photoUrl)}`} 
-                            alt={user.name || "User Avatar"} 
-                            className="w-full h-full object-cover"
+  <img
+    // ⬇️ UPDATE THIS LINE BELOW BY ADDING || "" INSIDE THE ENCODE
+    src={`/api/proxy-avatar?url=${encodeURIComponent(user.profilePicture || user.photoUrl || "")}`} 
+    alt={user.name || "User Avatar"} 
+    className="w-full h-full object-cover"
                             onError={(e) => {
                               (e.target as HTMLImageElement).style.display = 'none';
                             }}
