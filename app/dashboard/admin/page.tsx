@@ -134,9 +134,28 @@ export default function AdminDashboard() {
     if (!confirm("Are you sure you want to permanently purge this masterpiece from the database?")) return;
     
     try {
-      const res = await fetch(`http://localhost:5000/api/artworks/${artId}`, {
-        method: "DELETE"
-      });
+ const currentUser = JSON.parse(
+  localStorage.getItem("user") || "{}"
+);
+
+const res = await fetch(
+  `http://localhost:5000/api/artworks/${artId}`,
+  {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      authUser: currentUser,
+    }),
+  }
+);
+
+console.log("DELETE STATUS:", res.status);
+
+const data = await res.json();
+
+console.log("DELETE RESPONSE:", data);
       
       if (res.ok) {
         setArtworks(prev => prev.filter(art => art._id !== artId));
