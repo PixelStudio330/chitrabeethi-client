@@ -2,9 +2,10 @@ import type { Metadata } from "next";
 import { Fraunces, Inter } from "next/font/google";
 import "./globals.css";
 import Navbar from "./components/Navbar";
+import FullscreenLoader from "./components/Loading"; // 1. Import the loader
 import { Toaster } from "react-hot-toast";
 import { AuthProvider } from './context/AuthContext';
-import { WishlistProvider } from "../utils/WishlistContext"; // Correctly importing from utils
+import { WishlistProvider } from "../utils/WishlistContext";
 import { GoogleOAuthProvider } from '@react-oauth/google';
 
 const fraunces = Fraunces({
@@ -35,7 +36,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${fraunces.variable} ${inter.variable} font-body bg-cream text-ink antialiased`}>
-        {/* The global toaster */}
+        {/* 2. Add the Loader here at the root level */}
+        <FullscreenLoader /> 
+        
         <Toaster position="top-left" reverseOrder={false} />
         <GoogleOAuthProvider clientId={googleClientId}>
           <AuthProvider>

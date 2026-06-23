@@ -182,8 +182,8 @@ export default function Home() {
                 চিত্রবীথি
               </h1>
               <div className="flex flex-col items-center mt-[-5px] md:mt-[-20px]">
-                <p className="text-lg md:text-3xl tracking-[0.8em] md:tracking-[1.2em] font-black text-[#3D2B1F] uppercase border-t-[2px] md:border-t-[4px] border-[#3D2B1F] pt-2 md:pt-4 leading-none">
-                  চিত্রবীথি
+                <p className="text-lg md:text-3xl tracking-[0.8em] md:tracking-[1.2em] font-black text-[#3D2B1F] uppercase border-t-[2px] md:border-t-[4px] border-[#3D2B1F] pt-6 md:pt-4 leading-none">
+                  ArtHub
                 </p>
                 <p className="text-[8px] md:text-[11px] tracking-[0.3em] md:tracking-[0.6em] text-[#5C4033] uppercase mt-4 md:mt-6 font-bold opacity-70">
                    CHITRABEETHI • THE FINE ART GALLERY — ESTD 2026
@@ -203,8 +203,8 @@ export default function Home() {
 
             <div className="max-w-md lg:text-left text-center px-4">
               <h2 className="text-[#3D2B1F] text-3xl md:text-6xl font-black uppercase tracking-tighter leading-[0.9] italic">
-                THE SOUL OF THE <br /> 
-                <span className="text-[#E2B4BD]">BENGAL</span> <span className="text-[#8A9A5B]">CANVAS</span>
+                The Soul of The <br /> 
+                <span className="text-[#E2B4BD]">Canvas</span>
               </h2>
               <p className="text-[10px] md:text-sm text-[#5C4033] mt-4 md:mt-6 uppercase tracking-[0.15em] md:tracking-[0.2em] font-bold leading-relaxed">
                 Reality is a lie meant for the living. Die a little to the world, and let your wildest imagination spill onto the canvas.
