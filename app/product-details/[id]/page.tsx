@@ -224,7 +224,7 @@ export default function ArtworkDetails() {
         ...prev, 
         name: artFormData.name,
         price: artFormData.price,
-        category: artFormData.category,
+        category: artFormData.category as any,
         tag: artFormData.tag,
         description: artFormData.description,
         img: artFormData.img,
