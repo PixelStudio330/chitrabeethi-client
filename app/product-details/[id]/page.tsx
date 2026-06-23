@@ -19,7 +19,8 @@ import {
   Check,
   Loader2,
   Layers,
-  Activity
+  Activity,
+  Zap
 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -37,6 +38,7 @@ export default function ArtworkDetails() {
   const [artwork, setArtwork] = useState<ArtworkData | null>(null);
   const [comments, setComments] = useState<CommentData[]>([]);
   const [hasPurchased, setHasPurchased] = useState<boolean>(false); 
+  const [purchaseCount, setPurchaseCount] = useState<number>(0); // Track total user acquisitions for constraints
   const [newComment, setNewComment] = useState("");
   const [loading, setLoading] = useState(true);
   const [isZoomed, setIsZoomed] = useState(false);
@@ -51,7 +53,7 @@ export default function ArtworkDetails() {
   const [isSavingArtwork, setIsSavingArtwork] = useState(false);
   const [isDeletingArtwork, setIsDeletingArtwork] = useState(false);
 
-  // Artwork Editing Form State (Added 'status' here)
+  // Artwork Editing Form State
   const [artFormData, setArtFormData] = useState({
     name: "",
     price: 0,
@@ -114,9 +116,22 @@ export default function ArtworkDetails() {
           });
         }
 
+        // Gather Comments & Purchase History Details
         const responseData = await getCommentsByArtwork(id as string, user?.id);
         setComments(responseData.comments || []);
         setHasPurchased(responseData.hasPurchased || false);
+
+        // Fetch user transaction history pipeline to enforce limits accurately on frontend
+        if (user?.id) {
+          const txRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/payments/my-transactions?userId=${user.id}`);
+          const txJson = await txRes.json();
+          if (txJson && txJson.success && Array.isArray(txJson.data)) {
+            const successfulPurchases = txJson.data.filter(
+              (tx: any) => tx.type === "purchase" && tx.status === "successful"
+            );
+            setPurchaseCount(successfulPurchases.length);
+          }
+        }
       } catch (err) {
         console.error("Database connection failure on resource lookup:", err);
         setArtwork(null);
@@ -173,7 +188,6 @@ export default function ArtworkDetails() {
     }
   };
 
-  // Submit revised artwork fields directly to backend REST server engine
   const handleSaveArtworkEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user?.id || !id || !artwork) return;
@@ -181,7 +195,6 @@ export default function ArtworkDetails() {
     try {
       setIsSavingArtwork(true);
       
-      // Building exact payload with authUser details to satisfy updateArtwork controller guard rules
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/artworks/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -207,7 +220,6 @@ export default function ArtworkDetails() {
         return;
       }
 
-      // Sync active view reference layout state instantly 
       setArtwork((prev) => prev ? { 
         ...prev, 
         name: artFormData.name,
@@ -229,7 +241,6 @@ export default function ArtworkDetails() {
     }
   };
 
-  // Permanently purge artwork listing asset from system repository
   const handleDeleteArtwork = async () => {
     if (!user?.id || !id) return;
     if (!confirm("Are you completely certain you want to purge this artwork from the vault repository? This cannot be undone.")) return;
@@ -361,11 +372,20 @@ export default function ArtworkDetails() {
     }
   };
 
-  // Check ownership matches based on backend controller payload parsing strings
+  // Check ownership matches based on backend controller configurations
   const isArtistOwner = artwork && user && (user.id === artwork.artist?._id || user.id === artwork.artist);
-  const isPurchaseDisabled = artwork?.status === "sold" || isArtistOwner || paymentLoading;
+  
+  // 💡 DYNAMIC SUBSCRIPTION RESTRICTIONS PIPELINE FIXED
+  // Normalizes tier string handling from user auth context object data models cleanly
+  const activeTier = ((user as any)?.subscriptionTier || "free").toLowerCase();
+  
+  // Evaluates strict tier maximum bounds correctly so Pro accounts can pass intermediate ranges
+  const isTierRestricted = 
+    (activeTier === "free" && purchaseCount >= 3) || 
+    (activeTier === "pro" && purchaseCount >= 9);
 
-  // Helper function to extract a clean string ID representing the artist resource safely
+  const isPurchaseDisabled = artwork?.status === "sold" || isArtistOwner || paymentLoading || isTierRestricted;
+
   const getArtistId = () => {
     if (!artwork || !artwork.artist) return "";
     return typeof artwork.artist === "object" ? artwork.artist._id : artwork.artist;
@@ -504,7 +524,7 @@ export default function ArtworkDetails() {
         )}
       </AnimatePresence>
 
-      {/* DYNAMIC CORE ARTWORK DATA EDITING MODAL (Connected to Database) */}
+      {/* DYNAMIC CORE ARTWORK DATA EDITING MODAL */}
       <AnimatePresence>
         {isArtEditModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -578,7 +598,6 @@ export default function ArtworkDetails() {
                   </div>
                 </div>
 
-                {/* Grid Row for Tag and Status Selector Fields */}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <label className="text-[9px] font-black uppercase tracking-widest text-[#3D2B1F]/60 pl-1">Classification Sub-Tag</label>
@@ -778,30 +797,41 @@ export default function ArtworkDetails() {
 
             <div className="flex flex-col gap-2 mt-2">
               <div className="flex gap-4">
-                <motion.button 
-                  whileHover={!isPurchaseDisabled ? { scale: 1.02, y: -2 } : {}}
-                  whileTap={!isPurchaseDisabled ? { scale: 0.98 } : {}}
-                  onClick={handlePurchase}
-                  disabled={isPurchaseDisabled}
-                  className={`flex-1 font-black uppercase tracking-[0.2em] text-xs py-4 px-6 rounded-full flex items-center justify-center gap-3 transition-all duration-300 shadow-lg ${
-                    isPurchaseDisabled
-                      ? "bg-[#3D2B1F]/10 text-[#3D2B1F]/30 cursor-not-allowed shadow-none line-through"
-                      : "bg-[#E2B4BD] text-[#3D2B1F] hover:bg-[#8A9A5B] hover:text-[#FDFBF7]"
-                  }`}
-                >
-                  <span>
-                    {artwork.status === "sold" 
-                      ? "Artwork Sold Out" 
-                      : isArtistOwner 
-                        ? "You Own This Piece" 
-                        : paymentLoading
-                          ? "Securing Session..."
-                          : user 
-                            ? "Buy Now" 
-                            : "Log In to Acquire"}
-                  </span>
-                  <ShoppingBag size={16} strokeWidth={2.5} />
-                </motion.button>
+                {isTierRestricted && artwork.status !== "sold" && !isArtistOwner ? (
+                  <motion.button 
+                    whileHover={{ scale: 1.02, y: -2 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => router.push("/dashboard/user")}
+                    className="flex-1 bg-[#E2B4BD] text-[#3D2B1F] border-[3px] border-[#3D2B1F] font-black uppercase tracking-[0.15em] text-xs py-4 px-6 rounded-full flex items-center justify-center gap-2 shadow-[4px_4px_0px_#3D2B1F] hover:shadow-none transition-all duration-300"
+                  >
+                    <Zap size={14} /> Upgrade to Unlock Vault Space
+                  </motion.button>
+                ) : (
+                  <motion.button 
+                    whileHover={!isPurchaseDisabled ? { scale: 1.02, y: -2 } : {}}
+                    whileTap={!isPurchaseDisabled ? { scale: 0.98 } : {}}
+                    onClick={handlePurchase}
+                    disabled={isPurchaseDisabled}
+                    className={`flex-1 font-black uppercase tracking-[0.2em] text-xs py-4 px-6 rounded-full flex items-center justify-center gap-3 transition-all duration-300 shadow-lg ${
+                      isPurchaseDisabled
+                        ? "bg-[#3D2B1F]/10 text-[#3D2B1F]/30 cursor-not-allowed shadow-none line-through"
+                        : "bg-[#8A9A5B] text-[#FDFBF7] hover:bg-[#3D2B1F] border-2 border-transparent focus:border-[#3D2B1F]"
+                    }`}
+                  >
+                    <span>
+                      {artwork.status === "sold" 
+                        ? "Artwork Sold Out" 
+                        : isArtistOwner 
+                          ? "You Own This Piece" 
+                          : paymentLoading
+                            ? "Securing Session..."
+                            : user 
+                              ? "Buy Now" 
+                              : "Log In to Acquire"}
+                    </span>
+                    <ShoppingBag size={16} strokeWidth={2.5} />
+                  </motion.button>
+                )}
 
                 <motion.button
                   whileHover={{ scale: 1.05 }}
@@ -816,6 +846,12 @@ export default function ArtworkDetails() {
                   <Heart size={20} fill={isWishlisted ? "currentColor" : "none"} strokeWidth={2.5} />
                 </motion.button>
               </div>
+
+              {isTierRestricted && artwork.status !== "sold" && !isArtistOwner && (
+                <p className="text-[10px] text-center font-bold text-red-700 uppercase tracking-wider mt-1">
+                  ⚠️ Limit Reached: You own {purchaseCount} items on the {activeTier} tier (Max: {activeTier === "free" ? 3 : 9}). Upgrade to acquire more art.
+                </p>
+              )}
 
               {isArtistOwner && (
                 <p className="text-[10px] text-center font-bold text-red-700/70 tracking-wide mt-1">

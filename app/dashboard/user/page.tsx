@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ShoppingBag,
@@ -17,7 +17,8 @@ import {
   Tag,
   Eye,
   MessageSquare,
-  ArrowRight
+  ArrowRight,
+  Zap
 } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "../../context/AuthContext";
@@ -74,16 +75,21 @@ interface CommentData {
   } | null;
 }
 
-export default function UserDashboard() {
-  const { user } = useAuth();
+function DashboardContent() {
+  const { user, setUser } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [transactions, setTransactions] = useState<TransactionData[]>([]);
   const [wishlistItems, setWishlistItems] = useState<WishlistItemData[]>([]);
   const [comments, setComments] = useState<CommentData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isUpgrading, setIsUpgrading] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"collection" | "history" | "wishlist" | "comments" >("collection");
+  const [activeTab, setActiveTab] = useState<"collection" | "history" | "wishlist" | "comments">("collection");
+  
+  // Local tier state to act as a bridge when AuthContext token is stale
+  const [localTier, setLocalTier] = useState<string | null>(null);
 
   const fetchDashboardData = async () => {
     if (!user?.id) return;
@@ -99,7 +105,6 @@ export default function UserDashboard() {
       if (txJson && txJson.success && Array.isArray(txJson.data)) {
         paidRecords = txJson.data;
       } else {
-        // Fallback placeholder logic
         const fallbackRes = await fetch(`http://localhost:5000/api/artworks`);
         const fallbackJson = await fallbackRes.json();
         
@@ -119,22 +124,29 @@ export default function UserDashboard() {
       }
       setTransactions(paidRecords);
 
-      // 2. Load User Wishlist
-      console.log("Requesting wishlist data for user ID:", user.id);
+      // 2. Optional: Fetch fresh user data directly from DB to verify sync tier bypasses stale cache
+      try {
+        const userProfileRes = await fetch(`http://localhost:5000/api/users/${user.id}`);
+        const userProfileJson = await userProfileRes.json();
+        if (userProfileJson && userProfileJson.success && userProfileJson.user?.subscriptionTier) {
+          setLocalTier(userProfileJson.user.subscriptionTier);
+        }
+      } catch (profileErr) {
+        console.warn("Direct profile sync bypass unavailable:", profileErr);
+      }
+
+      // 3. Load User Wishlist
       const wishlistRes = await fetch(`http://localhost:5000/api/wishlist?userId=${user.id}`);
       const wishlistJson = await wishlistRes.json();
-
       if (wishlistJson && wishlistJson.success && Array.isArray(wishlistJson.data)) {
         setWishlistItems(wishlistJson.data);
       } else {
         setWishlistItems([]);
       }
 
-      // 3. Load User Comments
-      console.log("Requesting user comments stream for ID:", user.id);
+      // 4. Load User Comments
       const commentsRes = await fetch(`http://localhost:5000/api/comments/user/${user.id}`);
       const commentsJson = await commentsRes.json();
-
       if (commentsJson && commentsJson.success && Array.isArray(commentsJson.data)) {
         setComments(commentsJson.data);
       } else {
@@ -142,21 +154,98 @@ export default function UserDashboard() {
       }
 
     } catch (err: any) {
-      console.error("Dashboard core alignment sync error:", err);
-      setErrorMsg("Failed to establish live interface sync with Chitrabeethi database infrastructure.");
+      console.error("Dashboard alignment sync error:", err);
+      setErrorMsg("Failed to establish live interface sync with database infrastructure.");
     } finally {
       setIsLoading(false);
     }
   };
 
-  useEffect(() => {
+useEffect(() => {
+    const handleIncomingPaymentVerification = async () => {
+      const sessionId = searchParams.get("session_id");
+      if (!sessionId) {
+        if (user) fetchDashboardData();
+        return;
+      }
+
+      try {
+        setIsLoading(true);
+        const verifyRes = await fetch("http://localhost:5000/api/payments/verify-payment", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sessionId }),
+        });
+
+        const verifyJson = await verifyRes.json();
+
+        if (verifyRes.ok) {
+          // 🌟 FIX: Commit the verified backend user state to AuthContext so it saves to localStorage
+          if (verifyJson && verifyJson.user) {
+            setUser(verifyJson.user);
+          } else if (verifyJson && verifyJson.subscriptionTier) {
+            setUser((prev: any) => prev ? { ...prev, subscriptionTier: verifyJson.subscriptionTier } : null);
+          } else {
+            // Fallback sync using the query parameter helper if the backend doesn't return the full user payload
+            const target = searchParams.get("tier") || "pro"; 
+            setUser((prev: any) => prev ? { ...prev, subscriptionTier: target } : null);
+            setLocalTier(target);
+          }
+          
+          // Clear query params elegantly without triggering context flashes
+          window.history.replaceState({}, document.title, window.location.pathname);
+          
+          // Trigger a clean state fetch update
+          if (user) await fetchDashboardData();
+        } else {
+          console.error("Payment verification fallback warning:", verifyJson.message);
+        }
+      } catch (err) {
+        console.error("Payment alignment verification execution failure:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
     if (user) {
-      fetchDashboardData();
+      handleIncomingPaymentVerification();
     } else {
       const timer = setTimeout(() => router.push("/login"), 1000);
       return () => clearTimeout(timer);
     }
-  }, [user]);
+  }, [user, searchParams]);
+
+  const handleUpgradeTier = async (targetTier: "pro" | "premium") => {
+    if (!user?.id) return;
+    try {
+      setIsUpgrading(targetTier);
+      
+      // Pass target tier down query parameters to catch on return trip in case context drops
+      const res = await fetch("http://localhost:5000/api/payments/create-subscription-checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id, tier: targetTier }),
+      });
+      
+      const json = await res.json();
+      let checkoutUrl = json.url || (json.data && json.data.url);
+
+      if (checkoutUrl) {
+        // Inject tier parameter helper to bypass stale context fallback cycles on route redirect hook
+        if (checkoutUrl.includes("success_url")) {
+          checkoutUrl = checkoutUrl.replace("dashboard/user", `dashboard/user?tier=${targetTier}`);
+        }
+        window.location.assign(checkoutUrl);
+      } else {
+        alert(json.message || "Stripe context handshake dropped. Check backend route handlers.");
+      }
+    } catch (err) {
+      console.error("Billing upgrade sync failed:", err);
+      alert("Infrastructure deployment timeout or invalid route structure connection.");
+    } finally {
+      setIsUpgrading(null);
+    }
+  };
 
   const boughtArtworks = transactions.filter(
     (tx) => tx && tx.type === "purchase" && tx.status === "successful" && tx.artworkId
@@ -168,12 +257,14 @@ export default function UserDashboard() {
     0
   );
 
-  const activeTier = (user as any)?.subscriptionTier || "free";
+  // Fall back to local state tracker if it exists, otherwise use auth profile tier context
+  const activeTier = localTier || (user as any)?.subscriptionTier || "free";
+  
   const tierConfig = {
     free: { name: "Free Tier", max: 3, progressColor: "bg-[#3D2B1F]/30" },
     pro: { name: "Pro Collector", max: 9, progressColor: "bg-[#8A9A5B]" },
     premium: { name: "Premium Guild", max: Infinity, progressColor: "bg-[#E2B4BD]" }
-  }[activeTier as "free" | "pro" | "premium"] || { name: "Free Tier", max: 3, progressColor: "bg-[#3D2B1F]/30" };
+  }[activeTier as "free" | "pro" | "premium"] || { name: "Free Tier", max: 3, progressColor: "bg-[#3D2B1F]/30", };
 
   const progressPercent = tierConfig.max === Infinity 
     ? 100 
@@ -181,7 +272,6 @@ export default function UserDashboard() {
 
   return (
     <div className="min-h-screen bg-[#FDFBF7] text-[#3D2B1F] pt-32 pb-24 px-4 md:px-12 relative overflow-hidden font-sans select-none">
-      {/* Structural Ambient Geometric Layer Accents */}
       <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(61,43,31,0.02)_1px,transparent_1px),linear-gradient(to_bottom,rgba(61,43,31,0.02)_1px,transparent_1px)] bg-[size:32px_32px] pointer-events-none" />
       <div className="absolute top-[15%] left-[-80px] w-[450px] h-[450px] bg-[#EFF2E7]/40 rounded-full blur-[80px] pointer-events-none" />
       <div className="absolute bottom-5 right-[-60px] w-[400px] h-[400px] bg-[#F5E6E8]/40 rounded-full blur-[100px] pointer-events-none" />
@@ -198,7 +288,7 @@ export default function UserDashboard() {
               MY <span className="text-[#8A9A5B] italic font-normal">DASHBOARD</span>
             </h1>
             <p className="text-xs font-medium opacity-60 uppercase tracking-wider mt-2">
-              Welcome back, {user?.name || "Patron of the Arts"} — Explore your private vault stash
+              Welcome back, {user?.name || "Patron of the Arts"} — Current Standing: {tierConfig.name}
             </p>
           </div>
 
@@ -214,35 +304,73 @@ export default function UserDashboard() {
           </div>
         </div>
 
-        {/* --- ANALYTICS CARDS --- */}
+        {/* --- ANALYTICS & SUBSCRIPTION MATRIX --- */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
           
-          {/* Membership State Card */}
-          <div className="bg-[#EFF2E7] border-[3px] border-[#3D2B1F] rounded-3xl p-6 shadow-[4px_4px_0px_#3D2B1F] relative overflow-hidden">
-            <div className="absolute right-4 top-4 text-[#8A9A5B] opacity-20">
-              <Layers size={48} />
-            </div>
-            <p className="text-[10px] font-black uppercase tracking-widest text-[#3D2B1F]/60 mb-1">Membership State</p>
-            <h3 className="text-2xl font-black uppercase tracking-tight text-[#3D2B1F] mb-4 flex items-center gap-2">
-              {tierConfig.name}
-              {activeTier !== "free" && <ShieldCheck size={18} className="text-[#8A9A5B]" />}
-            </h3>
-            
-            <div className="space-y-2">
-              <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider">
-                <span>Vault Space Spent</span>
-                <span>{tierConfig.max === Infinity ? `${purchaseCount} / 👑` : `${purchaseCount} / ${tierConfig.max} Artworks`}</span>
+          {/* Membership State Card with Stripe Actions */}
+          <div className="bg-[#EFF2E7] border-[3px] border-[#3D2B1F] rounded-3xl p-6 shadow-[4px_4px_0px_#3D2B1F] relative overflow-hidden flex flex-col justify-between">
+            <div>
+              <div className="absolute right-4 top-4 text-[#8A9A5B] opacity-20">
+                <Layers size={48} />
               </div>
-              <div className="w-full bg-[#FDFBF7] border-[2px] border-[#3D2B1F] rounded-full h-3 overflow-hidden p-0.5">
-                <div 
-                  className={`h-full rounded-full ${tierConfig.progressColor} transition-all duration-500`}
-                  style={{ width: `${progressPercent}%` }}
-                />
+              <p className="text-[10px] font-black uppercase tracking-widest text-[#3D2B1F]/60 mb-1">Membership State</p>
+              <h3 className="text-2xl font-black uppercase tracking-tight text-[#3D2B1F] mb-4 flex items-center gap-2">
+                {tierConfig.name}
+                {activeTier !== "free" && <ShieldCheck size={18} className="text-[#8A9A5B]" />}
+              </h3>
+              
+              <div className="space-y-2 mb-6">
+                <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider">
+                  <span>Vault Allocation Used</span>
+                  <span>{tierConfig.max === Infinity ? `${purchaseCount} / 👑 Unlimited` : `${purchaseCount} / ${tierConfig.max} Artworks`}</span>
+                </div>
+                <div className="w-full bg-[#FDFBF7] border-[2px] border-[#3D2B1F] rounded-full h-3 overflow-hidden p-0.5">
+                  <div 
+                    className={`h-full rounded-full ${tierConfig.progressColor} transition-all duration-500`}
+                    style={{ width: `${progressPercent}%` }}
+                  />
+                </div>
               </div>
             </div>
-            <p className="text-[9px] font-medium text-[#3D2B1F]/60 mt-3 italic">
-              * Based on active structural tier allowances constraint variables.
-            </p>
+
+            {/* Subscriptions CTA Interface Elements */}
+            <div className="pt-4 border-t border-[#3D2B1F]/10 space-y-2">
+              {activeTier === "free" && (
+                <>
+                  <button
+                    disabled={isUpgrading !== null}
+                    onClick={() => handleUpgradeTier("pro")}
+                    className="w-full bg-[#8A9A5B] text-[#FDFBF7] font-black text-[10px] uppercase tracking-widest py-2.5 rounded-xl border-2 border-[#3D2B1F] flex items-center justify-center gap-1.5 shadow-[2px_2px_0px_#3D2B1F] hover:shadow-none transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isUpgrading === "pro" ? <Loader2 className="animate-spin" size={12} /> : <Zap size={11} />}
+                    Upgrade to Pro ($9.99)
+                  </button>
+                  <button
+                    disabled={isUpgrading !== null}
+                    onClick={() => handleUpgradeTier("premium")}
+                    className="w-full bg-[#E2B4BD] text-[#3D2B1F] font-black text-[10px] uppercase tracking-widest py-2.5 rounded-xl border-2 border-[#3D2B1F] flex items-center justify-center gap-1.5 shadow-[2px_2px_0px_#3D2B1F] hover:shadow-none transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isUpgrading === "premium" ? <Loader2 className="animate-spin" size={12} /> : <Sparkles size={11} />}
+                    Go Premium Unlimited ($19.99)
+                  </button>
+                </>
+              )}
+              {activeTier === "pro" && (
+                <button
+                  disabled={isUpgrading !== null}
+                  onClick={() => handleUpgradeTier("premium")}
+                  className="w-full bg-[#E2B4BD] text-[#3D2B1F] font-black text-[10px] uppercase tracking-widest py-2.5 rounded-xl border-2 border-[#3D2B1F] flex items-center justify-center gap-1.5 shadow-[2px_2px_0px_#3D2B1F] hover:shadow-none transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isUpgrading === "premium" ? <Loader2 className="animate-spin" size={12} /> : <Sparkles size={11} />}
+                  Upgrade to Premium Guild ($19.99)
+                </button>
+              )}
+              {activeTier === "premium" && (
+                <div className="text-center py-1 bg-[#3D2B1F]/5 rounded-xl text-[9px] font-bold text-[#8A9A5B] uppercase tracking-wider">
+                  👑 Absolute Sovereign Access Tier Enabled
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Quick Metrics Multiplier Tracker */}
@@ -270,7 +398,6 @@ export default function UserDashboard() {
               Review saved masterworks or backstories seamlessly before they are claimed.
             </p>
           </div>
-
         </div>
 
         {/* --- NAVIGATION SWITCHER CONTROLLER --- */}
@@ -324,19 +451,19 @@ export default function UserDashboard() {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.22, ease: "easeOut" }}
                 className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
               >
                 {boughtArtworks.map((tx, idx) => {
                   const art = tx.artworkId;
                   if (!art) return null;
-                  
-                  const exhibitionCreator = art.artist?.name || art.artistName || "Verified Masterpiece Creator";
+                  const exhibitionCreator = art.artist?.name || art.artistName || "Verified Creator";
 
                   return (
                     <motion.div
                       key={tx._id}
                       initial={{ opacity: 0, y: 12 }}
-                      animate={{ opacity: 1, y: 0, transition: { delay: idx * 0.05 } }}
+                      animate={{ opacity: 1, y: 0, transition: { delay: idx * 0.04 } }}
                       className="bg-[#FDFBF7] border-[3px] border-[#3D2B1F] rounded-3xl overflow-hidden shadow-[4px_4px_0px_#3D2B1F] hover:shadow-none hover:translate-x-1 hover:translate-y-1 transition-all duration-200 flex flex-col group"
                     >
                       <div className="aspect-square relative overflow-hidden bg-[#3D2B1F]/5 border-b-[3px] border-[#3D2B1F]">
@@ -366,7 +493,6 @@ export default function UserDashboard() {
                             <span className="text-xs font-mono font-bold text-[#8A9A5B]">৳{(art.price || 0).toLocaleString()}</span>
                           </div>
 
-                          {/* 🍃 FIXED ROUTE: point to /product-details/[id] dynamically */}
                           <Link href={`/product-details/${art._id}`}>
                             <span className="inline-flex items-center gap-1.5 px-3 py-2 bg-[#EFF2E7] hover:bg-[#8A9A5B] hover:text-[#FDFBF7] text-[#3D2B1F] border-[2px] border-[#3D2B1F] rounded-xl text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer">
                               View Details <Eye size={10} />
@@ -397,6 +523,7 @@ export default function UserDashboard() {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.22, ease: "easeOut" }}
                 className="bg-[#FDFBF7] border-[3px] border-[#3D2B1F] rounded-3xl overflow-hidden shadow-[4px_4px_0px_#3D2B1F]"
               >
                 <div className="overflow-x-auto">
@@ -431,7 +558,7 @@ export default function UserDashboard() {
                               {tableCreator}
                             </td>
                             <td className="p-4 font-mono font-bold text-[#8A9A5B]">
-                              ৳{(tx.amount || 0).toLocaleString()}
+                              {tx.type === "subscription" ? `$${tx.amount / 100}` : `৳${(tx.amount || 0).toLocaleString()}`}
                             </td>
                             <td className="p-4 text-[#3D2B1F]/60 font-mono">
                               {tx.createdAt ? new Date(tx.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : "---"}
@@ -463,12 +590,12 @@ export default function UserDashboard() {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.22, ease: "easeOut" }}
                 className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
               >
                 {wishlistItems.map((item, idx) => {
                   const art = item.artwork;
                   if (!art) return null;
-                  
                   const wishlistCreator = art.artist?.name || art.artistName || "Exhibition Creator";
 
                   return (
@@ -503,14 +630,12 @@ export default function UserDashboard() {
 
                         <div className="flex items-center justify-between pt-2 border-t border-[#3D2B1F]/10">
                           <span className="text-sm font-mono font-bold text-[#3D2B1F]">৳{(art.price || 0).toLocaleString()}</span>
-                          
-                          {/* 🍃 FIXED ROUTE: point to /product-details/[id] dynamically */}
-                          <button
+                          <motion.button
                             onClick={() => router.push(`/product-details/${art._id}`)}
                             className="bg-[#3D2B1F] text-[#FDFBF7] border-2 border-[#3D2B1F] rounded-xl px-3 py-1.5 text-[9px] font-black uppercase tracking-widest hover:bg-[#8A9A5B] transition-colors flex items-center gap-1"
                           >
                             View Details <ArrowUpRight size={11} />
-                          </button>
+                          </motion.button>
                         </div>
                       </div>
                     </motion.div>
@@ -533,6 +658,7 @@ export default function UserDashboard() {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.22, ease: "easeOut" }}
                 className="space-y-4"
               >
                 {comments.map((comment, idx) => (
@@ -569,7 +695,6 @@ export default function UserDashboard() {
                     </div>
 
                     {comment.artworkId && (
-                      /* 🍃 FIXED ROUTE: point to /product-details/[id] dynamically */
                       <button
                         onClick={() => router.push(`/product-details/${comment.artworkId?._id}`)}
                         className="inline-flex items-center gap-1.5 px-3 py-2 bg-[#EFF2E7] hover:bg-[#3D2B1F] hover:text-[#FDFBF7] text-[#3D2B1F] border-[2px] border-[#3D2B1F] rounded-xl text-[9px] font-black uppercase tracking-widest transition-all whitespace-nowrap self-end sm:self-auto cursor-pointer"
@@ -583,7 +708,7 @@ export default function UserDashboard() {
                 {comments.length === 0 && (
                   <div className="bg-[#FDFBF7] border-[3px] border-dashed border-[#3D2B1F]/20 rounded-3xl py-16 text-center">
                     <MessageSquare className="mx-auto text-[#3D2B1F]/20 mb-3" size={32} />
-                    <p className="text-xs font-black uppercase tracking-widest text-[#3D2B1F]/40">You haven't left any narrative reviews yet</p>
+                    <p className="text-xs font-black uppercase tracking-widest text-[#3D2B1F]/40">You haven't left any reviews yet</p>
                   </div>
                 )}
               </motion.div>
@@ -594,5 +719,17 @@ export default function UserDashboard() {
 
       </div>
     </div>
+  );
+}
+
+export default function UserDashboard() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-[#FDFBF7]">
+        <Loader2 className="animate-spin text-[#8A9A5B]" size={36} />
+      </div>
+    }>
+      <DashboardContent />
+    </Suspense>
   );
 }

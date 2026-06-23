@@ -8,12 +8,13 @@ interface User {
   email: string;
   role: 'user' | 'artist' | 'admin';
   profilePicture?: string;
-  photoUrl?: string; // 🌟 Added so frontend components match backend properties cleanly
+  photoUrl?: string; 
+  subscriptionTier?: string; // 🌟 ADDED: Enforces explicit tier tracking in the User interface
 }
 
 interface AuthContextType {
   user: User | null;
-  setUser: React.Dispatch<React.SetStateAction<User | null>>; // 🌟 1. Added Type Signature
+  setUser: React.Dispatch<React.SetStateAction<User | null>>; 
   token: string | null;
   isLoading: boolean;
   login: (token: string, user: User) => void;
@@ -27,6 +28,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Synchronize state mutations with localStorage cleanly
+  const updateUserAndStorage = (updater: React.SetStateAction<User | null>) => {
+    setUser((prevUser) => {
+      const nextUser = typeof updater === 'function' ? updater(prevUser) : updater;
+      if (nextUser) {
+        localStorage.setItem('user', JSON.stringify(nextUser));
+      } else {
+        localStorage.removeItem('user');
+      }
+      return nextUser;
+    });
+  };
 
   useEffect(() => {
     const initializeAuth = () => {
@@ -94,8 +108,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    // 🌟 2. Passed setUser directly into the shared values object
-    <AuthContext.Provider value={{ user, setUser, token, isLoading, login, loginWithGoogle, logout }}>
+    <AuthContext.Provider value={{ user, setUser: updateUserAndStorage, token, isLoading, login, loginWithGoogle, logout }}>
       {children}
     </AuthContext.Provider>
   );

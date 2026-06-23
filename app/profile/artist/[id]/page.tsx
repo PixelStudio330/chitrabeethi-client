@@ -10,6 +10,8 @@ import {
   Sparkles,
   Paintbrush,
   Eye,
+  EyeOff,
+  Lock,
   Trash2,
   Edit3,
   SlidersHorizontal,
@@ -86,6 +88,12 @@ export default function ProfilePage() {
     name: "",
     photoUrl: "",
   });
+
+  // --- Password State Fields ---
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const [artworks, setArtworks] = useState<Artwork[]>([]);
   const [publicArtistInfo, setPublicArtistInfo] = useState<ArtistProfile | null>(null);
@@ -341,26 +349,37 @@ export default function ProfilePage() {
   const displayProfileRole = isOwner ? (user?.role || "Artist") : (publicArtistInfo?.role || "Artist");
 
   const currentDbImageValue = user?.profilePicture || user?.photoUrl || user?.avatar || user?.img || "";
+  
+  // Adjusted to track modifications when text inside password configurations changes as well
   const isFormChanged =
     formData.name.trim() !== (user?.name || "") ||
-    formData.photoUrl.trim() !== (currentDbImageValue.includes("ui-avatars.com") ? "" : currentDbImageValue);
+    formData.photoUrl.trim() !== (currentDbImageValue.includes("ui-avatars.com") ? "" : currentDbImageValue) ||
+    password.trim() !== "";
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     if (!isFormChanged || updating || !isOwner) return;
     e.preventDefault();
+
+    if (password !== confirmPassword) {
+      triggerToast("Passwords do not match. 🏛️", "error");
+      return;
+    }
 
     setMessage({ status: "", text: "" });
     setUpdating(true);
     triggerToast("Updating account information...", "loading");
 
     try {
+      const payload = {
+        userId: user.id || user._id,
+        name: formData.name.trim(),
+        photoUrl: formData.photoUrl.trim(),
+        ...(password.trim() !== "" && { password })
+      };
+
       const response = await api.put(
         "/api/auth/update-profile",
-        {
-          userId: user.id || user._id,
-          name: formData.name.trim(),
-          photoUrl: formData.photoUrl.trim(),
-        },
+        payload,
         { withCredentials: true }
       );
 
@@ -369,6 +388,9 @@ export default function ProfilePage() {
         setUser(updatedUser);
         localStorage.setItem("user", JSON.stringify(updatedUser));
         
+        // Reset password state fields smoothly on successful update
+        setPassword("");
+        setConfirmPassword("");
         setIsEditing(false);
         triggerToast("Profile saved successfully.", "success");
 
@@ -525,6 +547,59 @@ export default function ProfilePage() {
                       placeholder="https://images.unsplash.com/your-image.jpg"
                       className="w-full p-3 bg-[#FAF6F0] rounded-xl border border-[#EADFC9]/60 text-xs font-semibold focus:outline-none focus:border-[#8A9A5B]"
                     />
+                  </div>
+
+                  {/* PASSWORD INPUT LOGIC CONTAINER ROW BLOCK */}
+                  <div className="grid grid-cols-1 gap-4 mt-4 pt-4 border-t border-[#3D2B1F]/10">
+                    <div>
+                      <label className="block text-[10px] font-black text-[#3D2B1F]/60 uppercase tracking-widest mb-1.5 ml-1">
+                        New Password (Leave blank to keep current)
+                      </label>
+                      <div className="relative rounded-xl bg-[#3D2B1F]/5 border border-[#3D2B1F]/20 focus-within:border-[#3D2B1F] transition-all overflow-hidden">
+                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-[#3D2B1F]/50">
+                          <Lock size={14} />
+                        </div>
+                        <input
+                          type={showPassword ? "text" : "password"}
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          placeholder="••••••••"
+                          className="w-full pl-10 pr-10 py-2.5 text-xs font-semibold text-[#3D2B1F] bg-transparent focus:outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-[#3D2B1F]/50 hover:text-[#3D2B1F] focus:outline-none"
+                        >
+                          {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-black text-[#3D2B1F]/60 uppercase tracking-widest mb-1.5 ml-1">
+                        Verify New Password
+                      </label>
+                      <div className="relative rounded-xl bg-[#3D2B1F]/5 border border-[#3D2B1F]/20 focus-within:border-[#3D2B1F] transition-all overflow-hidden">
+                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-[#3D2B1F]/50">
+                          <Lock size={14} />
+                        </div>
+                        <input
+                          type={showConfirmPassword ? "text" : "password"}
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          placeholder="••••••••"
+                          className="w-full pl-10 pr-10 py-2.5 text-xs font-semibold text-[#3D2B1F] bg-transparent focus:outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-[#3D2B1F]/50 hover:text-[#3D2B1F] focus:outline-none"
+                        >
+                          {showConfirmPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                        </button>
+                      </div>
+                    </div>
                   </div>
 
                   {isFormChanged && (
