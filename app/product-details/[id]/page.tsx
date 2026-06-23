@@ -373,7 +373,7 @@ export default function ArtworkDetails() {
   };
 
   // Check ownership matches based on backend controller configurations
-  const isArtistOwner = artwork && user && (user.id === artwork.artist?._id || user.id === artwork.artist);
+  const isArtistOwner = artwork && user && (user.id === artwork.artist?._id || user.id === artwork.artist as any);
   
   // 💡 DYNAMIC SUBSCRIPTION RESTRICTIONS PIPELINE FIXED
   // Normalizes tier string handling from user auth context object data models cleanly
