@@ -17,7 +17,9 @@ import {
   Tag,
   Eye,
   Image as ImageIcon,
-  UploadCloud
+  UploadCloud,
+  SlidersHorizontal,
+  Search
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { getArtworks, ArtworkData } from "../../../utils/api";
@@ -48,8 +50,10 @@ export default function ArtistDashboard() {
   const [hoveredBarIndex, setHoveredBarIndex] = useState<number | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<"add" | "edit">("add");
-  const [selectedArtworkId, setSelectedArtworkId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"inventory" | "analytics">("inventory");
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>("All");
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [selectedArtworkId, setSelectedArtworkId] = useState<string | null>(null);
 
   // Strict Schema Mapping Form Schema
   const [formData, setFormData] = useState({
@@ -255,6 +259,19 @@ export default function ArtistDashboard() {
 
   const maxPiecesCount = Math.max(...velocityGraphData.map(d => d.count), 1);
 
+  // Filter artworks dynamically based on selection and artwork name search
+  const filteredArtworks = artworks.filter(art => {
+    if (!art) return false;
+    
+    const matchesCategory = selectedCategoryFilter === "All" || art.category === selectedCategoryFilter;
+    
+    const targetName = art.name || "";
+    const cleanQuery = searchQuery.toLowerCase().trim();
+    const matchesSearch = cleanQuery === "" || targetName.toLowerCase().includes(cleanQuery);
+    
+    return matchesCategory && matchesSearch;
+  });
+
   return (
     <div className="min-h-screen bg-[#FDFBF7] text-[#3D2B1F] pt-32 pb-24 px-4 md:px-12 relative overflow-hidden font-sans select-none">
       
@@ -368,16 +385,63 @@ export default function ArtistDashboard() {
 
         </div>
 
-        {/* --- NAVIGATION ROOM TAB VIEW SWITCHER --- */}
-        <div className="flex gap-4 border-b-2 border-[#3D2B1F]/10 pb-4 mb-12">
-          <button 
-            onClick={() => setActiveTab("inventory")}
-            className={`px-5 py-2.5 rounded-full text-xs font-black uppercase tracking-widest transition-all ${
-              activeTab === "inventory" ? "bg-[#3D2B1F] text-[#FDFBF7] shadow-md" : "text-[#3D2B1F]/60 hover:text-[#3D2B1F] hover:bg-[#3D2B1F]/5"
-            }`}
-          >
-            📋 Collection Matrix ({artworks.length})
-          </button>
+        {/* --- NAVIGATION ROOM TAB VIEW SWITCHER & FILTER CHIPS --- */}
+        <div className="flex flex-col gap-6 border-b-2 border-[#3D2B1F]/10 pb-6 mb-12">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-center gap-4 flex-wrap">
+              <button 
+                onClick={() => setActiveTab("inventory")}
+                className={`px-5 py-2.5 rounded-full text-xs font-black uppercase tracking-widest transition-all ${
+                  activeTab === "inventory" ? "bg-[#3D2B1F] text-[#FDFBF7] shadow-md" : "text-[#3D2B1F]/60 hover:text-[#3D2B1F] hover:bg-[#3D2B1F]/5"
+                }`}
+              >
+                📋 Collection Matrix ({filteredArtworks.length !== artworks.length ? `${filteredArtworks.length}/${artworks.length}` : artworks.length})
+              </button>
+
+              {/* Artwork Search Bar Field Container */}
+              <div className="relative group w-full sm:w-64">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#3D2B1F]/40 group-focus-within:text-[#8A9A5B] transition-colors" size={14} />
+                <input 
+                  type="text"
+                  placeholder="Search by artwork name..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-white/50 border border-[#3D2B1F]/10 rounded-xl pl-9 pr-4 py-2 text-[11px] font-bold text-[#3D2B1F] focus:outline-none focus:border-[#8A9A5B] focus:bg-white transition-all shadow-inner"
+                />
+                {searchQuery && (
+                  <button 
+                    type="button" 
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#3D2B1F]/40 hover:text-[#3D2B1F]"
+                  >
+                    <X size={12} />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Dynamic Horizon Filtering Engine */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 max-w-full no-scrollbar">
+              <div className="flex items-center gap-1.5 bg-[#3D2B1F]/5 rounded-2xl p-1 border border-[#3D2B1F]/10">
+                <div className="px-2.5 text-[#3D2B1F]/60">
+                  <SlidersHorizontal size={12} strokeWidth={2.5} />
+                </div>
+                {["All", ...CATEGORIES].map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => setSelectedCategoryFilter(cat)}
+                    className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${
+                      selectedCategoryFilter === cat
+                        ? "bg-[#3D2B1F] text-[#FDFBF7]"
+                        : "text-[#3D2B1F]/70 hover:text-[#3D2B1F] hover:bg-[#3D2B1F]/5"
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* --- RENDERING SYSTEM ERROR NOTIFICATION ACCENT --- */}
@@ -388,91 +452,110 @@ export default function ArtistDashboard() {
           </div>
         )}
 
-        {/* --- ARTWORKS RECONSTRUCTED INTERACTION GRID --- */}
+        {/* --- ARTWORKS RECONSTRUCTED INTERACTION GRID INSIDE SCROLLABLE CONTAINER --- */}
         {isLoading ? (
           <div className="flex items-center justify-center py-24 gap-2 text-xs font-black uppercase tracking-widest text-[#3D2B1F]/40">
             <Loader2 className="animate-spin text-[#8A9A5B]" size={18} /> Loading backend logs...
           </div>
         ) : (
-          <AnimatePresence mode="popLayout">
-            {artworks.length === 0 ? (
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-24 max-w-sm mx-auto">
-                <div className="w-16 h-16 bg-[#3D2B1F]/5 rounded-full flex items-center justify-center text-[#3D2B1F]/30 mx-auto mb-4"><FolderHeart size={24} /></div>
-                <h3 className="text-sm font-black uppercase tracking-wider">No Listed Pieces</h3>
-                <p className="text-xs text-[#3D2B1F]/60 mt-1.5 font-medium">Use the activation action triggers above to publish new assets live onto the Chitrabeethi database registry.</p>
-              </motion.div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-                {artworks.map((art, index) => {
-                  const cardBg = CARD_BG_COLORS[index % CARD_BG_COLORS.length];
-                  
-                  let statusBadgeColor = "bg-[#8A9A5B]"; 
-                  if (art.status === "sold") statusBadgeColor = "bg-[#E2B4BD]";
-                  if (art.status === "unpublished") statusBadgeColor = "bg-stone-400 text-[#FDFBF7]";
+          <div className="max-h-[760px] overflow-y-auto pr-2 custom-dashboard-scroll rounded-[32px] border border-[#3D2B1F]/5 p-2 bg-[#3D2B1F]/[0.01]">
+            <style jsx global>{`
+              .custom-dashboard-scroll::-webkit-scrollbar {
+                width: 6px;
+              }
+              .custom-dashboard-scroll::-webkit-scrollbar-track {
+                background: transparent;
+              }
+              .custom-dashboard-scroll::-webkit-scrollbar-thumb {
+                background: #3D2B1F;
+                border-radius: 10px;
+              }
+              .custom-dashboard-scroll {
+                scrollbar-width: thin;
+                scrollbar-color: #3D2B1F transparent;
+              }
+            `}</style>
+            
+            <AnimatePresence mode="popLayout">
+              {filteredArtworks.length === 0 ? (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-24 max-w-sm mx-auto">
+                  <div className="w-16 h-16 bg-[#3D2B1F]/5 rounded-full flex items-center justify-center text-[#3D2B1F]/30 mx-auto mb-4"><FolderHeart size={24} /></div>
+                  <h3 className="text-sm font-black uppercase tracking-wider">No Matching Pieces</h3>
+                  <p className="text-xs text-[#3D2B1F]/60 mt-1.5 font-medium">No assets matches this specific query layer in the workspace selection stack right now.</p>
+                </motion.div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+                  {filteredArtworks.map((art, index) => {
+                    const cardBg = CARD_BG_COLORS[index % CARD_BG_COLORS.length];
+                    
+                    let statusBadgeColor = "bg-[#8A9A5B]"; 
+                    if (art.status === "sold") statusBadgeColor = "bg-[#E2B4BD]";
+                    if (art.status === "unpublished") statusBadgeColor = "bg-stone-400 text-[#FDFBF7]";
 
-                  return (
-                    <motion.div
-                      key={art._id}
-                      layout
-                      whileHover={{ y: -6 }}
-                      transition={{ type: "spring", stiffness: 300, damping: 22 }}
-                      className={`group relative ${cardBg} border-[3px] border-[#3D2B1F] rounded-[32px] p-5 shadow-[6px_6px_0px_0px_#3D2B1F] flex flex-col justify-between`}
-                    >
-                      <div className={`absolute -top-3 -left-3 border-2 border-[#3D2B1F] text-[#3D2B1F] text-[8px] font-black uppercase tracking-wider px-3 py-1 rounded-full rotate-[-4deg] z-10 ${statusBadgeColor}`}>
-                        {art.status} ✨
-                      </div>
-
-                      <div 
-                        onClick={() => navigateToDetails(art._id)}
-                        className="w-full aspect-square bg-[#3D2B1F]/5 border-2 border-[#3D2B1F]/10 rounded-[22px] overflow-hidden mb-4 relative cursor-pointer"
+                    return (
+                      <motion.div
+                        key={art._id}
+                        layout
+                        whileHover={{ y: -6 }}
+                        transition={{ type: "spring", stiffness: 300, damping: 22 }}
+                        className={`group relative ${cardBg} border-[3px] border-[#3D2B1F] rounded-[32px] p-5 shadow-[6px_6px_0px_0px_#3D2B1F] flex flex-col justify-between`}
                       >
-                        <img src={art.img} alt={art.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                        <div className="absolute top-2 right-2 bg-[#3D2B1F] text-[#FDFBF7] text-[9px] font-black px-2.5 py-1 rounded-lg">
-                          ৳{art.price}
-                        </div>
-                      </div>
-
-                      <div className="flex-1 flex flex-col justify-between">
-                        <div>
-                          <div className="flex items-center gap-1.5 mb-1">
-                            <span className="text-[#8A9A5B] text-[8px] font-black tracking-widest uppercase">{art.category}</span>
-                            <span className="text-[#3D2B1F]/40 text-[8px] font-bold">•</span>
-                            <span className="text-[#3D2B1F]/60 text-[8px] font-black uppercase tracking-wider bg-[#3D2B1F]/5 px-1.5 py-0.5 rounded-md">{art.tag}</span>
-                          </div>
-                          <h4 className="text-xl font-bold italic tracking-tight text-[#3D2B1F] lowercase">{art.name}</h4>
-                          <p className="text-[11px] text-[#3D2B1F]/70 font-medium line-clamp-2 mt-1 leading-relaxed">{art.description}</p>
+                        <div className={`absolute -top-3 -left-3 border-2 border-[#3D2B1F] text-[#3D2B1F] text-[8px] font-black uppercase tracking-wider px-3 py-1 rounded-full rotate-[-4deg] z-10 ${statusBadgeColor}`}>
+                          {art.status} ✨
                         </div>
 
-                        <div className="flex flex-col gap-2 mt-5">
-                          <button
-                            onClick={() => navigateToDetails(art._id)}
-                            className="w-full bg-[#E2B4BD] text-[#3D2B1F] border-2 border-[#3D2B1F] hover:bg-[#E2B4BD]/80 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-[2px_2px_0px_0px_#3D2B1F]"
-                          >
-                            <Eye size={12} strokeWidth={3} /> View Details
-                          </button>
-
-                          <div className="flex gap-2">
-                            <button 
-                              onClick={() => openEditModal(art)}
-                              className="flex-1 bg-[#FDFBF7] border-2 border-[#3D2B1F] hover:bg-[#3D2B1F]/5 text-[#3D2B1F] py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5"
-                            >
-                              <Edit2 size={11} /> Configure
-                            </button>
-                            <button 
-                              onClick={() => handleDeleteArtwork(art._id)}
-                              className="p-2.5 bg-[#F5E6E8] hover:bg-[#E2B4BD]/40 text-[#3D2B1F] border-2 border-[#3D2B1F] rounded-xl transition-all"
-                            >
-                              <Trash2 size={12} />
-                            </button>
+                        <div 
+                          onClick={() => navigateToDetails(art._id)}
+                          className="w-full aspect-square bg-[#3D2B1F]/5 border-2 border-[#3D2B1F]/10 rounded-[22px] overflow-hidden mb-4 relative cursor-pointer"
+                        >
+                          <img src={art.img} alt={art.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                          <div className="absolute top-2 right-2 bg-[#3D2B1F] text-[#FDFBF7] text-[9px] font-black px-2.5 py-1 rounded-lg">
+                            ৳{art.price}
                           </div>
                         </div>
-                      </div>
-                    </motion.div>
-                  );
-                })}
-              </div>
-            )}
-          </AnimatePresence>
+
+                        <div className="flex-1 flex flex-col justify-between">
+                          <div>
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <span className="text-[#8A9A5B] text-[8px] font-black tracking-widest uppercase">{art.category}</span>
+                              <span className="text-[#3D2B1F]/40 text-[8px] font-bold">•</span>
+                              <span className="text-[#3D2B1F]/60 text-[8px] font-black uppercase tracking-wider bg-[#3D2B1F]/5 px-1.5 py-0.5 rounded-md">{art.tag}</span>
+                            </div>
+                            <h4 className="text-xl font-bold italic tracking-tight text-[#3D2B1F] lowercase">{art.name}</h4>
+                            <p className="text-[11px] text-[#3D2B1F]/70 font-medium line-clamp-2 mt-1 leading-relaxed">{art.description}</p>
+                          </div>
+
+                          <div className="flex flex-col gap-2 mt-5">
+                            <button
+                              onClick={() => navigateToDetails(art._id)}
+                              className="w-full bg-[#E2B4BD] text-[#3D2B1F] border-2 border-[#3D2B1F] hover:bg-[#E2B4BD]/80 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-[2px_2px_0px_0px_#3D2B1F]"
+                            >
+                              <Eye size={12} strokeWidth={3} /> View Details
+                            </button>
+
+                            <div className="flex gap-2">
+                              <button 
+                                onClick={() => openEditModal(art)}
+                                className="flex-1 bg-[#FDFBF7] border-2 border-[#3D2B1F] hover:bg-[#3D2B1F]/5 text-[#3D2B1F] py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5"
+                              >
+                                <Edit2 size={11} /> Configure
+                              </button>
+                              <button 
+                                onClick={() => handleDeleteArtwork(art._id)}
+                                className="p-2.5 bg-[#F5E6E8] hover:bg-[#E2B4BD]/40 text-[#3D2B1F] border-2 border-[#3D2B1F] rounded-xl transition-all"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              )}
+            </AnimatePresence>
+          </div>
         )}
 
       </div>

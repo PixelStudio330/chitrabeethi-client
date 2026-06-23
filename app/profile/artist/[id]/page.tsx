@@ -490,6 +490,11 @@ export default function ProfilePage() {
                 <h1 className="text-xl font-bold tracking-tight text-[#3D2B1F]">
                   {displayProfileName}
                 </h1>
+                {isOwner && user?.email && (
+                  <p className="text-xs font-medium text-[#3D2B1F]/60 break-all select-all">
+                    {user.email}
+                  </p>
+                )}
                 <p className="text-[10px] uppercase tracking-[0.15em] font-black text-[#3D2B1F]/40">
                   Collective Verified
                 </p>
@@ -527,6 +532,16 @@ export default function ProfilePage() {
                 </h3>
                 
                 <form onSubmit={handleUpdateProfile} className="space-y-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-[#3D2B1F]/70 uppercase ml-1">Email Address</label>
+                    <input
+                      type="text"
+                      value={user?.email || ""}
+                      disabled
+                      className="w-full p-3 bg-[#FAF6F0]/50 rounded-xl border border-[#EADFC9]/40 text-xs font-semibold text-[#3D2B1F]/50 cursor-not-allowed select-all"
+                    />
+                  </div>
+
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-[#3D2B1F]/70 uppercase ml-1">Public Handle Name</label>
                     <input
@@ -796,15 +811,16 @@ export default function ProfilePage() {
                             </Link>
 
                             {isOwner && (
-                              <div className="grid grid-cols-2 gap-2 mt-1">
+                              <div className="grid grid-cols-1 gap-2 mt-1">
                                 <button
                                   type="button"
-                                  onClick={() => router.push(`/product-details/${art._id}/edit`)}
-                                  className="bg-[#EADFC9]/40 hover:bg-[#EADFC9]/70 text-[#3D2B1F] py-2 rounded-xl flex items-center justify-center gap-1.5 transition-all text-[9px] font-bold uppercase tracking-wider"
-                                  title="Edit Listing Details"
+                                  onClick={() => router.push('/dashboard/artist')}
+                                  className="w-full bg-[#EADFC9]/40 hover:bg-[#3D2B1F] hover:text-white text-[#3D2B1F] py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all text-[9px] font-bold uppercase tracking-wider"
+                                  title="Modify Listing in Dashboard"
                                 >
                                   <Edit3 size={11} /> Modify
                                 </button>
+                           
                                 <button
                                   type="button"
                                   onClick={() => handleDeleteArtwork(art._id)}

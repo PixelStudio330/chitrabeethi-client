@@ -4,12 +4,13 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 
 interface User {
   id: string;
+  _id?: string; // Standardize for MongoDB variant schemas
   name: string;
   email: string;
   role: 'user' | 'artist' | 'admin';
   profilePicture?: string;
   photoUrl?: string; 
-  subscriptionTier?: string; // 🌟 ADDED: Enforces explicit tier tracking in the User interface
+  subscriptionTier?: string; // 🌟 Explicit tier tracker
 }
 
 interface AuthContextType {
@@ -20,6 +21,7 @@ interface AuthContextType {
   login: (token: string, user: User) => void;
   loginWithGoogle: (idToken: string) => Promise<{ success: boolean; role?: string; error?: string }>;
   logout: () => void;
+  refreshUserSession: () => Promise<void>; // 🌟 ADDED: Allows checkout pages to force-update state immediately
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -42,15 +44,65 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
+  // 🌟 HELPER FUNCTION: Fetch freshest user status data directly from database
+  const refreshUserSession = async () => {
+    const currentToken = localStorage.getItem('token');
+    const storedUser = localStorage.getItem('user');
+    if (!currentToken || !storedUser) return;
+
+    try {
+      const parsedUser = JSON.parse(storedUser);
+      const userId = parsedUser.id || parsedUser._id;
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
+
+      const response = await fetch(`${apiUrl}/api/auth/user/${userId}`, {
+        headers: {
+          'Authorization': `Bearer ${currentToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const freshUser = data.user || data;
+        if (freshUser) {
+          setUser(freshUser);
+          localStorage.setItem('user', JSON.stringify(freshUser));
+        }
+      }
+    } catch (err) {
+      console.error("Failed to automatically synchronize subscription profile matrix:", err);
+    }
+  };
+
   useEffect(() => {
-    const initializeAuth = () => {
+    const initializeAuth = async () => {
       try {
         const storedToken = localStorage.getItem('token');
         const storedUser = localStorage.getItem('user');
 
         if (storedToken && storedUser) {
           setToken(storedToken);
-          setUser(JSON.parse(storedUser));
+          const initialUser = JSON.parse(storedUser);
+          setUser(initialUser);
+
+          // 🌟 CRITICAL FIX: Instantly verify live database status upon state initialization
+          // This avoids using stale cached user values from local storage
+          const userId = initialUser.id || initialUser._id;
+          const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
+          
+          const response = await fetch(`${apiUrl}/api/auth/user/${userId}`, {
+            headers: { 'Authorization': `Bearer ${storedToken}` }
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            const freshUser = data.user || data;
+            if (freshUser) {
+              setUser(freshUser);
+              localStorage.setItem('user', JSON.stringify(freshUser));
+            }
+          }
         }
       } catch (error) {
         console.error("Error restoring auth state:", error);
@@ -108,7 +160,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, setUser: updateUserAndStorage, token, isLoading, login, loginWithGoogle, logout }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      setUser: updateUserAndStorage, 
+      token, 
+      isLoading, 
+      login, 
+      loginWithGoogle, 
+      logout,
+      refreshUserSession 
+    }}>
       {children}
     </AuthContext.Provider>
   );
